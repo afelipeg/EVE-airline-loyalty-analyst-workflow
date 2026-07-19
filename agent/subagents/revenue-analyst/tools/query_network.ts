@@ -28,6 +28,7 @@ export default defineTool({
         loadFactor: snapshot.loadFactor,
         raskMxn: snapshot.raskMxn,
         yieldMxnPerKm: snapshot.yieldMxnPerKm,
+        ancillaryShare: snapshot.ancillaryShare,
       },
       byRoute,
       byTier,
@@ -35,6 +36,9 @@ export default defineTool({
         "ASK (available seat-km) is fixed network capacity; it does not respond to loyalty or marketing actions.",
         "Loyalty and marketing actions move RPK, load factor, yield, and RASK — never ASK.",
         "RASK = (passenger revenue + ancillary revenue) / ASK. Yield = passenger revenue / paid RPK.",
+        "This tool has no row limit: `byRoute` covers the whole network (or the single requested route) and " +
+          "`byTier` all five tiers, so nothing here is truncated. Quote the returned figures as-is rather than " +
+          "re-deriving them from the rows.",
       ],
     };
   },

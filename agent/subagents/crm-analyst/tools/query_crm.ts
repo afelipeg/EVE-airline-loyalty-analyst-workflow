@@ -23,7 +23,9 @@ export default defineTool({
       Titanio: 5,
     };
 
-    let filtered = getUnifiedMembers().filter((member) => {
+    const allMembers = getUnifiedMembers();
+
+    let filtered = allMembers.filter((member) => {
       if (tier && tier.length > 0 && !tier.includes(member.tier)) return false;
       if (hub && hub.length > 0 && !hub.includes(member.homeHub)) return false;
       if (corporateOnly && !member.corporateAccount) return false;
@@ -50,12 +52,35 @@ export default defineTool({
       tierSince: member.tierSince,
     }));
 
+    // Shares are computed here, over the full matched set, because the model
+    // gets these wrong when it derives them in prose. `filtered` is the correct
+    // denominator; `members` below is truncated by `limit`.
+    const share = (part: number, whole: number) =>
+      whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10;
+
     const tierMix = Object.entries(
       filtered.reduce<Record<string, number>>((acc, member) => {
         acc[member.tier] = (acc[member.tier] ?? 0) + 1;
         return acc;
       }, {}),
-    ).map(([tierName, count]) => ({ tier: tierName, count }));
+    ).map(([tierName, count]) => ({ tier: tierName, count, sharePct: share(count, filtered.length) }));
+
+    const corporateMembers = filtered.filter((member) => member.corporateAccount).length;
+    const membersWithServiceCases = filtered.filter((member) => member.serviceCases12m > 0).length;
+
+    const rollup = {
+      matchedMembers: filtered.length,
+      totalMembers: allMembers.length,
+      matchedSharePct: share(filtered.length, allMembers.length),
+      corporateMembers,
+      corporateSharePct: share(corporateMembers, filtered.length),
+      membersWithServiceCases,
+      serviceCaseSharePct: share(membersWithServiceCases, filtered.length),
+      avgCsat:
+        filtered.length === 0
+          ? 0
+          : Math.round((filtered.reduce((sum, m) => sum + m.csat, 0) / filtered.length) * 10) / 10,
+    };
 
     const serviceHotspots = filtered
       .filter((member) => member.serviceCases12m >= 2)
@@ -69,9 +94,12 @@ export default defineTool({
         csat: member.csat,
       }));
 
+    const members = projected.slice(0, limit);
+
     return {
-      members: projected.slice(0, limit),
+      members,
       matchedCount: filtered.length,
+      rollup,
       tierMix,
       serviceHotspots,
       definitions: {
@@ -79,6 +107,11 @@ export default defineTool({
         serviceCases12m: "Count of service cases opened in the trailing 12 months.",
         corporateAccount: "Corporate account name if the member is enrolled under one, else null.",
       },
+      notes: [
+        `${filtered.length} of ${allMembers.length} members matched the filters; showing ${members.length}.`,
+        "Percentages and totals in `rollup` and `tierMix` cover every matched member, including those beyond " +
+          "the shown limit. Quote them as returned; do not recompute shares from the `members` list.",
+      ],
     };
   },
   toModelOutput(output) {

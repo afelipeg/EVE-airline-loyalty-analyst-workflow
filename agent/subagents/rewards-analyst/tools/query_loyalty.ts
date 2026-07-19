@@ -14,7 +14,9 @@ export default defineTool({
     limit: z.number().int().min(1).max(200).default(50),
   }),
   async execute({ cobrandCard, limit, minClvMxn, minRedemptions, sortBy }) {
-    let filtered = getUnifiedMembers().filter((member) => {
+    const allMembers = getUnifiedMembers();
+
+    let filtered = allMembers.filter((member) => {
       if (cobrandCard && member.cobrandCard !== cobrandCard) return false;
       if (minClvMxn !== undefined && member.clvMxn < minClvMxn) return false;
       if (minRedemptions !== undefined && member.redemptions12m < minRedemptions) return false;
@@ -53,12 +55,18 @@ export default defineTool({
       redemptionRate: totals.totalEarned12m === 0 ? 0 : round3(totals.totalRedeemed12m / totals.totalEarned12m),
     };
 
+    // Shares are computed here, over the full matched set, because the model
+    // gets these wrong when it derives them in prose. `filtered` is the correct
+    // denominator; `members` below is truncated by `limit`.
+    const share = (part: number, whole: number) =>
+      whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10;
+
     const cobrandMix = Object.entries(
       filtered.reduce<Record<string, number>>((acc, member) => {
         acc[member.cobrandCard] = (acc[member.cobrandCard] ?? 0) + 1;
         return acc;
       }, {}),
-    ).map(([card, count]) => ({ cobrandCard: card, count }));
+    ).map(([card, count]) => ({ cobrandCard: card, count, sharePct: share(count, filtered.length) }));
 
     const clvValues = filtered.map((member) => member.clvMxn);
     const clvSummary = {
@@ -67,9 +75,13 @@ export default defineTool({
       maxClvMxn: clvValues.length === 0 ? 0 : Math.max(...clvValues),
     };
 
+    const members = projected.slice(0, limit);
+
     return {
-      members: projected.slice(0, limit),
+      members,
       matchedCount: filtered.length,
+      totalMembers: allMembers.length,
+      matchedSharePct: share(filtered.length, allMembers.length),
       pointsEconomy,
       cobrandMix,
       clvSummary,
@@ -78,6 +90,12 @@ export default defineTool({
         clvMxn: "Modeled customer lifetime value in MXN.",
         redemptionRate: "pointsRedeemed12m / pointsEarned12m across the query scope.",
       },
+      notes: [
+        `${filtered.length} of ${allMembers.length} members matched the filters; showing ${members.length}.`,
+        "Percentages and totals in `pointsEconomy`, `cobrandMix`, and `clvSummary` cover every matched member, " +
+          "including those beyond the shown limit. Quote them as returned; do not recompute shares or totals " +
+          "from the `members` list.",
+      ],
     };
   },
   toModelOutput(output) {

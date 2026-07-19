@@ -14,7 +14,9 @@ export default defineTool({
     limit: z.number().int().min(1).max(200).default(50),
   }),
   async execute({ channel, limit, marketingSegment, maxLastLoginDays, npsSegment }) {
-    const filtered = getUnifiedMembers().filter((member) => {
+    const allMembers = getUnifiedMembers();
+
+    const filtered = allMembers.filter((member) => {
       if (marketingSegment && member.marketingSegment !== marketingSegment) return false;
       if (npsSegment && member.npsSegment !== npsSegment) return false;
       if (maxLastLoginDays !== undefined && member.lastLoginDays > maxLastLoginDays) return false;
@@ -40,10 +42,20 @@ export default defineTool({
       isDormant: member.lastLoginDays > 60,
     }));
 
+    // Shares are computed here, over the full matched set, because the model
+    // gets these wrong when it derives them in prose. `filtered` is the correct
+    // denominator; `members` below is truncated by `limit`.
+    const share = (part: number, whole: number) =>
+      whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10;
+
     const count = filtered.length || 1;
+    const dormantCount = filtered.filter((member) => member.lastLoginDays > 60).length;
     const engagementSummary = {
       matchedCount: filtered.length,
-      dormantCount: filtered.filter((member) => member.lastLoginDays > 60).length,
+      totalMembers: allMembers.length,
+      matchedSharePct: share(filtered.length, allMembers.length),
+      dormantCount,
+      dormantSharePct: share(dormantCount, filtered.length),
       avgLastLoginDays: round1(filtered.reduce((sum, m) => sum + m.lastLoginDays, 0) / count),
       avgEmailOpenRate90d: round1(filtered.reduce((sum, m) => sum + m.emailOpenRate90d, 0) / count),
       avgWebSessions90d: round1(filtered.reduce((sum, m) => sum + m.webSessions90d, 0) / count),
@@ -54,16 +66,28 @@ export default defineTool({
         acc[member.predictedChannel] = (acc[member.predictedChannel] ?? 0) + 1;
         return acc;
       }, {}),
-    ).map(([predictedChannel, memberCount]) => ({ predictedChannel, count: memberCount }));
+    ).map(([predictedChannel, memberCount]) => ({
+      predictedChannel,
+      count: memberCount,
+      sharePct: share(memberCount, filtered.length),
+    }));
 
+    const emailOptIn = filtered.filter((m) => m.emailOptIn).length;
+    const pushOptIn = filtered.filter((m) => m.pushOptIn).length;
+    const appInstalled = filtered.filter((m) => m.appInstalled).length;
     const consentSummary = {
-      emailOptIn: filtered.filter((m) => m.emailOptIn).length,
-      pushOptIn: filtered.filter((m) => m.pushOptIn).length,
-      appInstalled: filtered.filter((m) => m.appInstalled).length,
+      emailOptIn,
+      emailOptInSharePct: share(emailOptIn, filtered.length),
+      pushOptIn,
+      pushOptInSharePct: share(pushOptIn, filtered.length),
+      appInstalled,
+      appInstalledSharePct: share(appInstalled, filtered.length),
     };
 
+    const members = projected.slice(0, limit);
+
     return {
-      members: projected.slice(0, limit),
+      members,
       engagementSummary,
       channelMix,
       consentSummary,
@@ -73,6 +97,12 @@ export default defineTool({
         webSessions90d: "Count of web sessions over the trailing 90 days.",
         isDormant: "Heuristic flag: lastLoginDays > 60.",
       },
+      notes: [
+        `${filtered.length} of ${allMembers.length} members matched the filters; showing ${members.length}.`,
+        "Percentages and totals in `engagementSummary`, `channelMix`, and `consentSummary` cover every matched " +
+          "member, including those beyond the shown limit. Quote them as returned; do not recompute shares " +
+          "from the `members` list.",
+      ],
     };
   },
   toModelOutput(output) {

@@ -88,7 +88,7 @@ export function segmentMembers(
     totalRaskAtRiskMxn,
     loadFactor,
     topRetentionTargets,
-    takeaway: `${members.length} members scored; ${totalRaskAtRiskMxn.toLocaleString()} MXN of trailing-12m revenue is at risk; network load factor is ${(loadFactor * 100).toFixed(1)}%.`,
+    takeaway: `${members.length} members scored; ${totalRaskAtRiskMxn.toLocaleString()} MXN of trailing-12m revenue is at risk across the selected members. (Network load factor is a fixed-ASK metric — read it from query_members view=network.)`,
   };
 }
 

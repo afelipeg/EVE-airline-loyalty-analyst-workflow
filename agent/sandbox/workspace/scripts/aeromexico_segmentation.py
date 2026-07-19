@@ -84,7 +84,8 @@ top_retention_targets = sorted(
 
 takeaway = (
     f"{len(members)} members scored; {total_rask_at_risk:,.0f} MXN of trailing-12m revenue "
-    f"is at risk; network load factor is {load_factor * 100:.1f}%."
+    f"is at risk across the selected members. (Network load factor is a fixed-ASK metric "
+    f"— read it from query_members view=network.)"
 )
 
 output = {
@@ -268,7 +269,7 @@ report_lines = [
     "",
     f"- Chart: {chart}",
     f"- Members scored: {len(members)}",
-    f"- Network load factor: {load_factor * 100:.1f}%",
+    f"- Load factor (scored set): {load_factor * 100:.1f}%",
     f"- Total RASK-at-risk: {total_rask_at_risk:,.0f} MXN",
     "",
     "## Segments",

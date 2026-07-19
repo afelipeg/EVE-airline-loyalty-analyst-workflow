@@ -427,13 +427,13 @@ export const networkCapacity: readonly RouteCapacity[] = [
   { route: "MEX-MTY", distanceKm: 710, ask12mMillions: 0.09, blendedRaskTargetMxn: 1.7 },
   { route: "MEX-CUN", distanceKm: 1290, ask12mMillions: 0.14, blendedRaskTargetMxn: 1.55 },
   { route: "MEX-TIJ", distanceKm: 2280, ask12mMillions: 0.16, blendedRaskTargetMxn: 1.2 },
-  { route: "MEX-LAX", distanceKm: 2490, ask12mMillions: 0.18, blendedRaskTargetMxn: 1.15 },
+  { route: "MEX-LAX", distanceKm: 2490, ask12mMillions: 0.221, blendedRaskTargetMxn: 1.15 },
   { route: "MEX-JFK", distanceKm: 3360, ask12mMillions: 0.195, blendedRaskTargetMxn: 1.05 },
   { route: "MEX-BOG", distanceKm: 3160, ask12mMillions: 0.14, blendedRaskTargetMxn: 0.95 },
-  { route: "MEX-GRU", distanceKm: 7440, ask12mMillions: 0.225, blendedRaskTargetMxn: 0.8 },
-  { route: "MEX-MAD", distanceKm: 9070, ask12mMillions: 0.205, blendedRaskTargetMxn: 0.75 },
+  { route: "MEX-GRU", distanceKm: 7440, ask12mMillions: 0.282, blendedRaskTargetMxn: 0.8 },
+  { route: "MEX-MAD", distanceKm: 9070, ask12mMillions: 0.274, blendedRaskTargetMxn: 0.75 },
   { route: "MTY-IAH", distanceKm: 780, ask12mMillions: 0.045, blendedRaskTargetMxn: 1.6 },
-  { route: "GDL-LAX", distanceKm: 2230, ask12mMillions: 0.1, blendedRaskTargetMxn: 1.1 },
+  { route: "GDL-LAX", distanceKm: 2230, ask12mMillions: 0.122, blendedRaskTargetMxn: 1.1 },
 ];
 
 // --- Bookings: deterministic mulberry32 PRNG, never Math.random ---------

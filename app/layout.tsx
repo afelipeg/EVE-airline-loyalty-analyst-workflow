@@ -20,7 +20,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pulse | Eve Agent Stack Demo",
+  title: "Club Premier Loyalty Analyst | Aeromexico",
   description: "A runnable Eve analytics agent showcasing Vercel Agent Stack.",
 };
 

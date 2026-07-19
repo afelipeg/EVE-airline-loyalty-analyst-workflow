@@ -22,6 +22,8 @@
   --color-ring: var(--ring);
   --color-ink: var(--ink);
   --color-accent-teal: var(--accent-teal);
+  --color-accent-rose: var(--accent-rose);
+  --color-accent-turquoise: var(--accent-turquoise);
   --color-accent-gold: var(--accent-gold);
   --color-accent-cyan: var(--accent-cyan);
   --color-accent-purple: var(--accent-purple);
@@ -52,9 +54,11 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.82 0.016 88);
   --input: oklch(0.82 0.016 88);
-  --ring: oklch(0.54 0.107 177);
-  --ink: oklch(0.18 0.026 184);
-  --accent-teal: oklch(0.67 0.148 178);
+  --ring: oklch(0.538 0.242 261.8);
+  --ink: oklch(0.195 0.1 265.2);
+  --accent-teal: oklch(0.538 0.242 261.8);
+  --accent-rose: oklch(0.633 0.254 5.8);
+  --accent-turquoise: oklch(0.832 0.15 180.3);
   --accent-gold: oklch(0.77 0.144 78);
   --accent-cyan: oklch(0.68 0.112 224);
   --accent-purple: oklch(0.62 0.18 300);
@@ -81,9 +85,11 @@
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 12%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.67 0.148 178);
-    --ink: oklch(0.12 0.02 184);
-    --accent-teal: oklch(0.72 0.14 178);
+    --ring: oklch(0.678 0.162 260.7);
+    --ink: oklch(0.175 0.083 265.4);
+    --accent-teal: oklch(0.678 0.162 260.7);
+    --accent-rose: oklch(0.66 0.24 359);
+    --accent-turquoise: oklch(0.839 0.148 181.2);
     --accent-gold: oklch(0.8 0.13 78);
     --accent-cyan: oklch(0.75 0.1 224);
     --accent-purple: oklch(0.74 0.15 300);

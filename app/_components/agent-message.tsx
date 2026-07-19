@@ -234,7 +234,7 @@ function SandboxArtifactSummary({
   readonly output: EveDynamicToolPart["output"];
   readonly toolName: string;
 }) {
-  if (toolName !== "run_analysis") {
+  if (toolName !== "segment_members") {
     return null;
   }
 

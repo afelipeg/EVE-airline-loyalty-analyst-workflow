@@ -1,15 +1,15 @@
 // Eve seeds files under agent/sandbox/workspace/** into /workspace before the
 // session starts. This is the real Python program that runs in the isolated
 // sandbox, not a TypeScript string written by the app at runtime.
-const seededPythonScriptPath = "/workspace/scripts/pulse_analysis.py";
+const seededPythonScriptPath = "/workspace/scripts/aeromexico_segmentation.py";
 
 // These are the per-call files the tool creates inside the Eve sandbox.
 // Keeping the names stable makes the recording easy to narrate and makes the
 // artifact list predictable in the final answer.
 const artifactFileNames = {
-  chart: "pulse_chart.svg",
+  chart: "aeromexico_chart.svg",
   input: "input.json",
-  output: "pulse_analysis.json",
+  output: "aeromexico_segmentation.json",
   report: "report.md",
 } as const;
 

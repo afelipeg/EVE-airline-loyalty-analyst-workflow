@@ -4,16 +4,21 @@ import { useEveAgent } from "eve/react";
 import {
   ActivityIcon,
   AlertCircleIcon,
+  AwardIcon,
   BotIcon,
   CalendarClockIcon,
   CheckCircle2Icon,
   DatabaseIcon,
   Layers3Icon,
   MessageSquareIcon,
+  NetworkIcon,
+  PlaneIcon,
   PlayIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  TagIcon,
   TerminalSquareIcon,
+  UsersIcon,
   WrenchIcon,
   WorkflowIcon,
 } from "lucide-react";
@@ -30,23 +35,23 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getDashboardSnapshot } from "@/agent/lib/pulse-data";
+import { getDashboardSnapshot } from "@/agent/lib/aeromexico-data";
 import { AgentMessage } from "./agent-message";
 
-const AGENT_NAME = "Pulse";
+const AGENT_NAME = "Club Premier Analyst";
 const snapshot = getDashboardSnapshot();
 
 const suggestions = [
-  "How did signups do this week compared to last week?",
-  "Run the weekly metrics report and have the investigator check anomalies.",
-  "Plot paid conversions for the last two weeks and explain the trend.",
+  "Which Oro & Platino members on MEX–JFK are at churn risk, and which offer recovers the most RASK per peso?",
+  "How much RASK is at risk from high-value members who haven't flown in 90+ days — and the reactivation plan?",
+  "Weekly loyalty report: RASK-at-risk, load-factor by hub, and the 3 highest-ROI retention offers.",
 ];
 
 const stackMoments = [
   { label: "Eve", value: "filesystem agent", icon: Layers3Icon },
   { label: "AI Gateway", value: "model routing", icon: SparklesIcon },
   { label: "Sandbox", value: "isolated Python", icon: TerminalSquareIcon },
-  { label: "Subagents", value: "investigator", icon: BotIcon },
+  { label: "Subagents", value: "5 specialist analysts", icon: BotIcon },
   { label: "Workflow", value: "durable sessions", icon: WorkflowIcon },
   { label: "Vercel Connect", value: "Slack bot auth", icon: MessageSquareIcon },
 ];
@@ -84,7 +89,7 @@ export function AgentChat() {
     await agent.send({
       message: text,
       clientContext: {
-        demo: "Pulse Eve Agent Stack walkthrough",
+        demo: "Club Premier Eve Agent Stack walkthrough",
         currentWeek: snapshot.currentWeek,
         previousWeek: snapshot.previousWeek,
       },
@@ -93,7 +98,7 @@ export function AgentChat() {
 
   const composer = (
     <PromptInput onSubmit={handleSubmit}>
-      <PromptInputTextarea placeholder="Ask Pulse about signups, MRR, activation, or churn..." />
+      <PromptInputTextarea placeholder="Ask the Club Premier Analyst about RASK, load factor, churn risk, or offers..." />
       <PromptInputSubmit onStop={agent.stop} status={agent.status} />
     </PromptInput>
   );
@@ -113,9 +118,9 @@ export function AgentChat() {
               <StatusBadge status={agent.status} />
             </div>
             <p className="mt-5 text-sm leading-6 text-muted-foreground">
-              A runnable Eve analyst that reads demo SaaS data, runs sandboxed
-              analysis, delegates anomaly checks, and streams the durable run
-              into this web channel.
+              A runnable Eve analyst that reads Club Premier loyalty data,
+              runs sandboxed analysis, delegates to specialist subagents, and
+              streams the durable run into this web channel.
             </p>
           </section>
 
@@ -138,13 +143,13 @@ export function AgentChat() {
               <div>
                 <p className="eyebrow">Live Eve session</p>
                 <h2 className="mt-1 text-xl font-semibold tracking-normal">
-                  Ask Pulse anything about the two-week dataset
+                  Ask the Club Premier Analyst anything about the two-week dataset
                 </h2>
               </div>
               <Button
                 className="rounded-md"
                 disabled={isBusy}
-                onClick={() => sendSuggestion(suggestions[1])}
+                onClick={() => sendSuggestion(suggestions[2])}
                 type="button"
               >
                 <CalendarClockIcon className="size-4" />
@@ -189,9 +194,10 @@ export function AgentChat() {
                   Start with the hero prompt from the video.
                 </h3>
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                  Pulse will query deterministic SaaS data, run a sandboxed
-                  analysis step, delegate investigation when the numbers move,
-                  and return a recording-ready summary with concrete dates.
+                  The Club Premier Analyst will query deterministic loyalty
+                  data, run a sandboxed analysis step, delegate to specialist
+                  subagents when needed, and return a recording-ready summary
+                  with concrete dates.
                 </p>
               </div>
             </div>
@@ -359,7 +365,7 @@ function Timeline({
   if (isEmpty || visible.length === 0) {
     return (
       <div className="flex min-h-48 flex-1 items-center justify-center rounded-md border border-dashed border-border text-center text-sm text-muted-foreground">
-        Session events will appear here while Pulse works.
+        Session events will appear here while the Club Premier Analyst works.
       </div>
     );
   }
@@ -407,8 +413,8 @@ function toTimelineItem(
         eyebrow: "session",
         title: "Agent runtime online",
         detail: modelId
-          ? `Pulse is running on ${modelId}.`
-          : "Pulse opened a durable Eve session.",
+          ? `Club Premier Analyst is running on ${modelId}.`
+          : "Club Premier Analyst opened a durable Eve session.",
         meta: gitSha ? gitSha.slice(0, 7) : undefined,
         tone: "teal",
         icon: ActivityIcon,
@@ -457,21 +463,24 @@ function toTimelineItem(
         tone: "cyan",
         icon: CheckCircle2Icon,
       };
-    case "subagent.called":
+    case "subagent.called": {
+      const label = subagentLabel(event.data);
       return {
         key,
         eyebrow: "subagent",
-        title: "Investigator delegated",
-        detail: "Pulse handed the anomaly check to a specialist child agent.",
+        title: `${label} delegated`,
+        detail: `Club Premier Analyst handed the analysis to the ${label}.`,
         meta: readChildSession(event.data),
         tone: "gold",
         icon: BotIcon,
       };
-    case "subagent.completed":
+    }
+    case "subagent.completed": {
+      const label = subagentLabel(event.data);
       return {
         key,
         eyebrow: "subagent",
-        title: "Investigator completed",
+        title: `${label} completed`,
         detail: truncate(
           readString(asRecord(event.data)?.output) ??
             "The child agent returned its specialist handoff.",
@@ -481,6 +490,7 @@ function toTimelineItem(
         tone: "teal",
         icon: BotIcon,
       };
+    }
     case "step.started":
       return {
         key,
@@ -507,7 +517,7 @@ function toTimelineItem(
         title: "Final response ready",
         detail: truncate(
           readString(asRecord(event.data)?.message) ??
-            "Pulse finished the answer.",
+            "Club Premier Analyst finished the answer.",
           110,
         ),
         tone: "teal",
@@ -518,7 +528,7 @@ function toTimelineItem(
         key,
         eyebrow: "ready",
         title: "Session parked",
-        detail: "Pulse is waiting durably for the next turn.",
+        detail: "Club Premier Analyst is waiting durably for the next turn.",
         tone: "purple",
         icon: WorkflowIcon,
       };
@@ -558,11 +568,69 @@ function toTimelineItem(
   }
 }
 
+const SUBAGENT_LABELS: Record<string, string> = {
+  "crm-analyst": "CRM Analyst",
+  "cdp-analyst": "CDP Analyst",
+  "rewards-analyst": "Rewards Analyst",
+  "revenue-analyst": "Revenue Analyst",
+  "offer-strategist": "Offer Strategist",
+};
+
+const TOOL_META: Record<
+  string,
+  { readonly title: string; readonly icon: typeof ActivityIcon; readonly resultTitle: string }
+> = {
+  query_members: {
+    title: "Query members",
+    icon: UsersIcon,
+    resultTitle: "Members returned",
+  },
+  segment_members: {
+    title: "Segment members (sandbox)",
+    icon: TerminalSquareIcon,
+    resultTitle: "Segmentation completed",
+  },
+  query_crm: {
+    title: "CRM analysis",
+    icon: DatabaseIcon,
+    resultTitle: "CRM data returned",
+  },
+  query_cdp: {
+    title: "CDP engagement",
+    icon: NetworkIcon,
+    resultTitle: "CDP data returned",
+  },
+  query_loyalty: {
+    title: "Rewards & CLV",
+    icon: AwardIcon,
+    resultTitle: "Rewards data returned",
+  },
+  query_network: {
+    title: "Network RASK",
+    icon: PlaneIcon,
+    resultTitle: "Network data returned",
+  },
+  design_offers: {
+    title: "Design offers",
+    icon: TagIcon,
+    resultTitle: "Offers designed",
+  },
+};
+
+function subagentLabel(data: unknown) {
+  const record = asRecord(data);
+  const name =
+    readString(record?.subagentName) ?? readString(record?.name);
+  if (!name) return "Subagent";
+  return SUBAGENT_LABELS[name] ?? name;
+}
+
 function readActionTitle(data: unknown) {
   const names = readToolNames(data);
-  if (names.includes("investigator")) return "Subagent requested";
-  if (names.includes("run_analysis")) return "Sandbox analysis requested";
-  if (names.includes("query_metrics")) return "Metrics query requested";
+  const subagentName = names.find((name) => name in SUBAGENT_LABELS);
+  if (subagentName) return `${SUBAGENT_LABELS[subagentName]} requested`;
+  const toolName = names.find((name) => name in TOOL_META);
+  if (toolName) return `${TOOL_META[toolName].title} requested`;
   if (names.includes("load_skill")) return "Skill context requested";
   if (names.includes("bash")) return "Sandbox command requested";
   return names.length > 0 ? "Tool call requested" : "Action requested";
@@ -581,10 +649,11 @@ function readActionCount(data: unknown) {
 
 function readActionIcon(data: unknown) {
   const names = readToolNames(data);
-  if (names.includes("investigator")) return BotIcon;
-  if (names.includes("run_analysis") || names.includes("bash"))
-    return TerminalSquareIcon;
-  if (names.includes("query_metrics")) return DatabaseIcon;
+  const subagentName = names.find((name) => name in SUBAGENT_LABELS);
+  if (subagentName) return BotIcon;
+  const toolName = names.find((name) => name in TOOL_META);
+  if (toolName) return TOOL_META[toolName].icon;
+  if (names.includes("bash")) return TerminalSquareIcon;
   if (names.includes("load_skill")) return SparklesIcon;
   return WrenchIcon;
 }
@@ -607,11 +676,10 @@ function readActions(data: unknown) {
 function readToolResultTitle(data: unknown) {
   const result = asRecord(asRecord(data)?.result);
   const name = readString(result?.toolName) ?? readString(result?.subagentName);
-  if (name === "query_metrics") return "Metrics returned";
-  if (name === "run_analysis") return "Sandbox analysis completed";
+  if (name && name in SUBAGENT_LABELS) return `${SUBAGENT_LABELS[name]} result returned`;
+  if (name && name in TOOL_META) return TOOL_META[name].resultTitle;
   if (name === "load_skill") return "Definitions loaded";
   if (name === "bash") return "Sandbox command completed";
-  if (name === "investigator") return "Investigator result returned";
   return name ? `${name} returned` : "Action result returned";
 }
 
@@ -620,20 +688,7 @@ function readToolResultDetail(data: unknown) {
   const name = readString(result?.toolName) ?? readString(result?.subagentName);
   const output = result?.output;
 
-  if (name === "query_metrics") {
-    const outputRecord = asRecord(output);
-    const metrics = Array.isArray(outputRecord?.metrics)
-      ? outputRecord.metrics.filter(
-          (metric): metric is string => typeof metric === "string",
-        )
-      : [];
-    const rows = Array.isArray(outputRecord?.rows)
-      ? outputRecord.rows.length
-      : undefined;
-    return `${formatList(metrics)} data returned${rows ? ` across ${rows} rows` : ""}.`;
-  }
-
-  if (name === "run_analysis") {
+  if (name === "segment_members") {
     const outputRecord = asRecord(output);
     const sandbox = asRecord(outputRecord?.sandbox);
     const filesWritten = Array.isArray(sandbox?.filesWritten)
@@ -643,13 +698,35 @@ function readToolResultDetail(data: unknown) {
       ? ` Wrote ${filesWritten} sandbox artifacts.`
       : "";
     return truncate(
-      `${readString(outputRecord?.takeaway) ?? "Python analysis ran inside the Eve sandbox."}${artifactNote}`,
+      `${readString(outputRecord?.takeaway) ?? "Python segmentation ran inside the Eve sandbox."}${artifactNote}`,
       110,
     );
   }
 
+  if (
+    name === "query_members" ||
+    name === "query_crm" ||
+    name === "query_cdp" ||
+    name === "query_loyalty" ||
+    name === "query_network"
+  ) {
+    const outputRecord = asRecord(output);
+    const rows = Array.isArray(outputRecord?.rows)
+      ? outputRecord.rows.length
+      : undefined;
+    return `${TOOL_META[name].title} data returned${rows ? ` across ${rows} rows` : ""}.`;
+  }
+
+  if (name === "design_offers") {
+    const outputRecord = asRecord(output);
+    const offers = Array.isArray(outputRecord?.offers)
+      ? outputRecord.offers.length
+      : undefined;
+    return `Designed${offers ? ` ${offers}` : ""} retention offer${offers === 1 ? "" : "s"}.`;
+  }
+
   if (name === "load_skill") {
-    return "Pulse loaded metric definitions before answering.";
+    return "Club Premier Analyst loaded metric definitions before answering.";
   }
 
   if (name === "bash") {
@@ -674,7 +751,7 @@ function readToolResultMeta(data: unknown) {
   const result = asRecord(asRecord(data)?.result);
   const status = readString(asRecord(data)?.status);
   const name = readString(result?.toolName) ?? readString(result?.subagentName);
-  if (name === "run_analysis") {
+  if (name === "segment_members") {
     const sandbox = asRecord(asRecord(result?.output)?.sandbox);
     const filesWritten = Array.isArray(sandbox?.filesWritten)
       ? sandbox.filesWritten.length
@@ -754,20 +831,41 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function labelForMetric(metric: string) {
   const labels: Record<string, string> = {
-    activated: "Activated",
-    mrr: "MRR",
-    paidConversions: "Paid conversions",
-    signups: "Signups",
+    loadFactor: "Load Factor",
+    raskMxn: "RASK",
+    rpkMillions: "RPK filled",
+    valueAtRiskMxn: "Value at risk",
   };
   return labels[metric] ?? metric;
 }
 
 function formatValue(metric: string, value: number) {
-  if (metric === "mrr") {
+  if (metric === "loadFactor") {
     return new Intl.NumberFormat("en-US", {
-      currency: "USD",
-      maximumFractionDigits: 0,
+      style: "percent",
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(value);
+  }
+  if (metric === "raskMxn") {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+  if (metric === "rpkMillions") {
+    return `${new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 0,
+    }).format(value)} M`;
+  }
+  if (metric === "valueAtRiskMxn") {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "MXN",
+      notation: "compact",
+      maximumFractionDigits: 1,
     }).format(value);
   }
   return new Intl.NumberFormat("en-US").format(value);

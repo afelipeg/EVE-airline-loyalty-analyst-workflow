@@ -1,34 +1,39 @@
 import type { SandboxSession } from "eve/sandbox";
 
 import { buildPythonCommand, quoteShell, type SandboxPaths } from "./sandbox-paths";
-import type { AnalysisPoint, AnalysisResult, RunAnalysisOutput } from "./types";
+import type { InputRow } from "./schema";
+import type { ChartSelector, RunSegmentationOutput, SegmentationResult } from "./types";
 
 type SandboxRunInput = {
-  readonly fallback: AnalysisResult;
-  readonly metric: string;
+  readonly askMillions: number;
+  readonly chart: ChartSelector;
+  readonly fallback: SegmentationResult;
   readonly paths: SandboxPaths;
-  readonly points: readonly AnalysisPoint[];
+  readonly rows: readonly InputRow[];
+  readonly routes: readonly InputRow[];
   readonly sandbox: SandboxSession;
   readonly title: string;
 };
 
-export async function runPythonAnalysisInSandbox({
+export async function runSegmentationInSandbox({
+  askMillions,
+  chart,
   fallback,
-  metric,
   paths,
-  points,
+  rows,
+  routes,
   sandbox,
   title,
-}: SandboxRunInput): Promise<RunAnalysisOutput> {
+}: SandboxRunInput): Promise<RunSegmentationOutput> {
   await sandbox.run({ command: `mkdir -p ${quoteShell(paths.dir)}` });
   await sandbox.writeTextFile({
     path: paths.input,
-    content: JSON.stringify({ metric, points, title }, null, 2),
+    content: JSON.stringify({ askMillions, chart, rows, routes, title }, null, 2),
   });
 
   const command = buildPythonCommand(sandbox.resolvePath(paths.dir));
   const commandResult = await sandbox.run({ command });
-  const output = await readSandboxJson<AnalysisResult>(sandbox, paths.output, fallback);
+  const output = await readSandboxJson<SegmentationResult>(sandbox, paths.output, fallback);
   const reportMarkdown = await sandbox.readTextFile({ path: paths.report });
 
   return {
@@ -45,7 +50,7 @@ export async function runPythonAnalysisInSandbox({
       outputPath: paths.workspace.output,
       chartPath: paths.workspace.chart,
       reportPath: paths.workspace.report,
-      note: "Python executed inside the Eve sandbox and wrote analysis artifacts under /workspace.",
+      note: "Python executed inside the Eve sandbox and wrote segmentation artifacts under /workspace.",
       stdout: commandResult.stdout ?? "",
       stderr: commandResult.stderr ?? "",
     },
@@ -53,9 +58,9 @@ export async function runPythonAnalysisInSandbox({
 }
 
 export function withSandboxFailure(
-  fallback: AnalysisResult,
+  fallback: SegmentationResult,
   error: unknown,
-): RunAnalysisOutput {
+): RunSegmentationOutput {
   return {
     ...fallback,
     sandbox: {

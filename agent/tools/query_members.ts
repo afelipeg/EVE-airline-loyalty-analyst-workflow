@@ -47,10 +47,44 @@ export default defineTool({
     const sorted = [...filtered].sort((a, b) => b[sortBy] - a[sortBy]);
     const members = sorted.slice(0, limit);
 
+    // Shares are computed here, over the full matched set, because the model
+    // gets these wrong when it derives them in prose — a live answer reported a
+    // concentration share of 71% where the real figure was 54.1%. Every value
+    // the tool returns verbatim has been accurate; only the arithmetic on top of
+    // them drifts. Note the denominator is `filtered`, not `members`: the latter
+    // is truncated by `limit`, so aggregating it would understate the totals.
+    const totalRaskAtRiskMxn = filtered.reduce((sum, member) => sum + member.raskAtRiskMxn, 0);
+    const share = (part: number, whole: number) =>
+      whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10;
+
+    const rollup = {
+      matchedMembers: filtered.length,
+      totalMembers: allMembers.length,
+      totalRaskAtRiskMxn: Math.round(totalRaskAtRiskMxn),
+      bySegment: SEGMENTS.map((segmentName) => {
+        const inSegment = filtered.filter((member) => member.segment === segmentName);
+        const count = inSegment.length;
+        const segmentRask = inSegment.reduce((sum, m) => sum + m.raskAtRiskMxn, 0);
+
+        return {
+          segment: segmentName,
+          count,
+          memberSharePct: share(count, filtered.length),
+          totalRaskAtRiskMxn: Math.round(segmentRask),
+          raskAtRiskSharePct: share(segmentRask, totalRaskAtRiskMxn),
+          avgValueScore:
+            count === 0 ? 0 : Math.round((inSegment.reduce((s, m) => s + m.valueScore, 0) / count) * 10) / 10,
+          avgChurnRisk:
+            count === 0 ? 0 : Math.round((inSegment.reduce((s, m) => s + m.churnRisk, 0) / count) * 10) / 10,
+        };
+      }),
+    };
+
     return {
       view,
       network,
       members,
+      rollup,
       availableFilters: {
         tiers: TIERS,
         hubs: HUBS,
@@ -69,32 +103,19 @@ export default defineTool({
       notes: [
         FIXED_ASK_DOCTRINE,
         `${filtered.length} of ${allMembers.length} members matched the filters; showing ${members.length}.`,
+        "Percentages and totals in `rollup` cover every matched member, including those beyond the shown " +
+          "limit. Quote them as returned; do not recompute shares from the `members` list.",
       ],
     };
   },
   toModelOutput(output) {
-    const segmentAggregates = SEGMENTS.map((segmentName) => {
-      const inSegment = output.members.filter((member) => member.segment === segmentName);
-      const count = inSegment.length;
-      const avgValueScore = count === 0 ? 0 : inSegment.reduce((sum, m) => sum + m.valueScore, 0) / count;
-      const avgChurnRisk = count === 0 ? 0 : inSegment.reduce((sum, m) => sum + m.churnRisk, 0) / count;
-
-      return {
-        segment: segmentName,
-        count,
-        avgValueScore: Math.round(avgValueScore * 10) / 10,
-        avgChurnRisk: Math.round(avgChurnRisk * 10) / 10,
-        totalRaskAtRiskMxn: Math.round(inSegment.reduce((sum, m) => sum + m.raskAtRiskMxn, 0)),
-      };
-    });
-
     return {
       type: "json",
       value: {
         view: output.view,
         network: output.network,
         members: output.members,
-        segmentAggregates,
+        rollup: output.rollup,
         tierAggregates: output.network.byTier,
         availableFilters: output.availableFilters,
         definitions: output.definitions,

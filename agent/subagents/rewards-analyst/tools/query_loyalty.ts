@@ -11,7 +11,7 @@ export default defineTool({
     minClvMxn: z.number().optional(),
     minRedemptions: z.number().int().optional().describe("Minimum redemptions12m."),
     sortBy: z.enum(["clvMxn", "pointsBalance", "redemptions12m", "cardSpend12mMxn"]).default("clvMxn"),
-    limit: z.number().int().min(1).default(50),
+    limit: z.number().int().min(1).max(200).default(50),
   }),
   async execute({ cobrandCard, limit, minClvMxn, minRedemptions, sortBy }) {
     let filtered = getUnifiedMembers().filter((member) => {

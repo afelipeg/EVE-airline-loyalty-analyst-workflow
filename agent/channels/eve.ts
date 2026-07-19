@@ -7,8 +7,13 @@ export default eveChannel({
     vercelOidc(),
     // Open on localhost for `eve dev` and the REPL; ignored in production.
     localDev(),
-    // Public demo mode for the sponsored recording. Replace with app auth
-    // before using private customer data.
+    // Public demo mode: anyone with the URL can chat with the agent.
+    // This is deliberate, and safe ONLY because of the compensating controls:
+    // the dataset is synthetic, there are no send/write tools, sandbox egress
+    // is deny-all, and every dangerous framework tool (bash, web_fetch,
+    // write_file, ...) is disabled via the sentinels in tools/ and
+    // subagents/*/tools/. Token spend is capped by a Vercel WAF rate limit.
+    // Replace with app auth before any real customer data reaches this agent.
     none(),
   ],
 });

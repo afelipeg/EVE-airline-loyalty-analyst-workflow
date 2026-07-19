@@ -19,6 +19,7 @@ export default defineTool({
       .default("value_churn_scatter"),
     members: z
       .array(z.record(z.string(), primitiveValue))
+      .max(200)
       .optional()
       .describe("Member rows to segment. Defaults to all unified members."),
   }),
@@ -62,6 +63,9 @@ export default defineTool({
       });
       return { ...result, chart };
     } catch (error) {
+      // The model already sees sandbox.reason; this surfaces it in server logs
+      // so a degraded sandbox is visible in Vercel rather than only in-band.
+      console.error("[segment_members] sandbox execution failed", error);
       return { ...withSandboxFailure(fallback, error), chart };
     }
   },

@@ -12,7 +12,7 @@ export default defineTool({
     corporateOnly: z.boolean().optional().describe("Only members with a corporate account."),
     minServiceCases: z.number().int().optional().describe("Minimum serviceCases12m."),
     sortBy: z.enum(["tier", "csat", "serviceCases12m"]).default("tier"),
-    limit: z.number().int().min(1).default(50),
+    limit: z.number().int().min(1).max(200).default(50),
   }),
   async execute({ corporateOnly, hub, limit, minServiceCases, sortBy, tier }) {
     const tierRank: Record<string, number> = {

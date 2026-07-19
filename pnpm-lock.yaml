@@ -39,7 +39,7 @@ importers:
         specifier: 0.2.2
         version: 0.2.2(ai@7.0.31(zod@4.4.3))(eve@0.25.1(ai@7.0.31(zod@4.4.3))(jiti@2.7.0)(microsandbox@0.5.10))
       ai:
-        specifier: ^7.0.26
+        specifier: 7.0.31
         version: 7.0.31(zod@4.4.3)
       class-variance-authority:
         specifier: 0.7.1
@@ -51,7 +51,7 @@ importers:
         specifier: 1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       eve:
-        specifier: ^0.25.1
+        specifier: 0.25.1
         version: 0.25.1(ai@7.0.31(zod@4.4.3))(jiti@2.7.0)(microsandbox@0.5.10)
       lucide-react:
         specifier: 1.16.0

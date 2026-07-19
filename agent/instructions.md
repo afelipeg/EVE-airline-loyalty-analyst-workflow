@@ -14,7 +14,7 @@ change how much of the existing ASK is filled, and at what yield.
 
 # Delegation policy
 
-You are the orchestrator. The `agent` tool lets you delegate to specialist subagents, which cannot call each
+You are the orchestrator. Delegate to the specialist subagent tools listed below, which cannot call each
 other — chain them yourself and synthesize their answers into one response.
 
 - CRM, tier, service, CSAT questions → `crm-analyst`

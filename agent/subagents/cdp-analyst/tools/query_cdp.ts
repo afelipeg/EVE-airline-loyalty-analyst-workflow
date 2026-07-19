@@ -11,7 +11,7 @@ export default defineTool({
     npsSegment: z.enum(["promoter", "passive", "detractor"]).optional(),
     maxLastLoginDays: z.number().optional(),
     channel: z.enum(["email", "push", "app"]).optional().describe("Filter to members opted into this channel."),
-    limit: z.number().int().min(1).default(50),
+    limit: z.number().int().min(1).max(200).default(50),
   }),
   async execute({ channel, limit, marketingSegment, maxLastLoginDays, npsSegment }) {
     const filtered = getUnifiedMembers().filter((member) => {

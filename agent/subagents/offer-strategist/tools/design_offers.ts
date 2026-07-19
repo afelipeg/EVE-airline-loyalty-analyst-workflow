@@ -104,12 +104,15 @@ export default defineTool({
     "Design ranked Club Premier retention/growth offers from the member dataset, scored by RASK recovered per peso of incentive cost. Use before recommending offers.",
   inputSchema: z.object({
     segment: memberSegmentSchema.optional().describe("Target member segment. Defaults to all members."),
+    // Only memberId is read; every number comes from getUnifiedMembers() so the
+    // model cannot feed fabricated values into offer scoring.
     members: z
-      .array(z.object({ memberId: z.string() }).passthrough())
+      .array(z.object({ memberId: z.string() }))
+      .max(200)
       .optional()
       .describe("Explicit member rows to target, matched by memberId against the dataset."),
     objective: objectiveSchema.default("retention"),
-    maxOffers: z.number().int().min(1).default(5),
+    maxOffers: z.number().int().min(1).max(10).default(5),
   }),
   async execute({ maxOffers, members, objective, segment }) {
     const all = getUnifiedMembers();

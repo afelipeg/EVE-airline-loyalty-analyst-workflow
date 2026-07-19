@@ -1,4 +1,2 @@
 allowBuilds:
   sharp: true
-minimumReleaseAgeExclude:
-  - eve@0.20.0

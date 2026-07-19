@@ -139,9 +139,14 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
   }
 
   let Output = <div>{output as ReactNode}</div>;
+  let chartSvg: string | undefined;
 
-  if (typeof output === "object" && !isValidElement(output)) {
-    Output = <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
+  if (output !== null && typeof output === "object" && !isValidElement(output)) {
+    // Sandbox charts ride along the tool output as raw SVG. Split them out so the
+    // chart renders as an image and its markup never floods the JSON code block.
+    const { chartSvg: svg, ...rest } = output as Record<string, unknown>;
+    chartSvg = typeof svg === "string" ? svg : undefined;
+    Output = <CodeBlock code={JSON.stringify(rest, null, 2)} language="json" />;
   } else if (typeof output === "string") {
     Output = <CodeBlock code={output} language="json" />;
   }
@@ -151,6 +156,15 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
       <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {errorText ? "Error" : "Result"}
       </h4>
+      {chartSvg && (
+        // Rendered via a data URI in an <img> rather than inlined into the DOM:
+        // SVG loaded this way cannot execute script or fetch external resources.
+        <img
+          alt="Segmentation chart generated in the Eve sandbox"
+          className="w-full rounded-md border border-border bg-white"
+          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(chartSvg)}`}
+        />
+      )}
       <div
         className={cn(
           "app-scroll max-h-96 overflow-auto rounded-md text-xs [&_table]:w-full",

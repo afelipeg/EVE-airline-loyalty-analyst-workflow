@@ -50,6 +50,7 @@ export type SandboxFailure = {
 };
 
 export type RunSegmentationOutput = SegmentationResult & {
+  readonly chartSvg?: string;
   readonly reportMarkdown?: string;
   readonly sandbox: SandboxSuccess | SandboxFailure;
 };

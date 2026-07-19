@@ -35,9 +35,13 @@ export async function runSegmentationInSandbox({
   const commandResult = await sandbox.run({ command });
   const output = await readSandboxJson<SegmentationResult>(sandbox, paths.output, fallback);
   const reportMarkdown = await sandbox.readTextFile({ path: paths.report });
+  // The chart is rendered in the UI only. It is deliberately excluded from
+  // toModelOutput in the tool so the SVG markup never enters model context.
+  const chartSvg = await sandbox.readTextFile({ path: paths.chart });
 
   return {
     ...output,
+    ...(chartSvg === null ? {} : { chartSvg }),
     ...(reportMarkdown === null ? {} : { reportMarkdown }),
     sandbox: {
       used: true,

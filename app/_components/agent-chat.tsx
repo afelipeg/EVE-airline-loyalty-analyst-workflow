@@ -99,7 +99,11 @@ export function AgentChat() {
   const composer = (
     <PromptInput onSubmit={handleSubmit}>
       <PromptInputTextarea placeholder="Ask the Club Premier Analyst about RASK, load factor, churn risk, or offers..." />
-      <PromptInputSubmit onStop={agent.stop} status={agent.status} />
+      <PromptInputSubmit
+        className="bg-accent-rose text-white hover:bg-accent-rose/90"
+        onStop={agent.stop}
+        status={agent.status}
+      />
     </PromptInput>
   );
 
@@ -126,7 +130,7 @@ export function AgentChat() {
 
           <section className="dashboard-panel shrink-0 p-4">
             <div className="mb-4 flex items-center gap-2">
-              <DatabaseIcon className="size-4 text-accent-teal" />
+              <DatabaseIcon className="size-4 text-accent-blue" />
               <h2 className="section-title">Metrics Snapshot</h2>
             </div>
             <div className="grid gap-3">
@@ -187,7 +191,7 @@ export function AgentChat() {
           {isEmpty ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
               <div className="max-w-2xl">
-                <div className="mx-auto flex size-14 items-center justify-center rounded-md border border-accent-teal/35 bg-accent-teal/10 text-accent-teal">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-md border border-accent-blue/35 bg-accent-blue/10 text-accent-blue">
                   <ActivityIcon className="size-7" />
                 </div>
                 <h3 className="mt-6 text-3xl font-semibold tracking-normal">
@@ -231,7 +235,7 @@ export function AgentChat() {
         <aside className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
           <section className="dashboard-panel shrink-0 p-4">
             <div className="mb-4 flex items-center gap-2">
-              <ShieldCheckIcon className="size-4 text-accent-teal" />
+              <ShieldCheckIcon className="size-4 text-accent-blue" />
               <h2 className="section-title">Agent Stack</h2>
             </div>
             <div className="grid gap-2">
@@ -244,7 +248,7 @@ export function AgentChat() {
           <section className="dashboard-panel flex min-h-0 flex-1 flex-col overflow-hidden p-4">
             <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <WorkflowIcon className="size-4 text-accent-cyan" />
+                <WorkflowIcon className="size-4 text-accent-turquoise" />
                 <h2 className="section-title">Run Timeline</h2>
               </div>
               <span className="font-mono text-[11px] text-muted-foreground">
@@ -269,7 +273,7 @@ function StatusBadge({ status }: { readonly status: AgentStatus }) {
     <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium uppercase tracking-[0.12em]">
       <span className="relative flex size-2">
         {isLive ? (
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent-teal opacity-75" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent-turquoise opacity-75" />
         ) : null}
         <span
           className={cn(
@@ -277,7 +281,7 @@ function StatusBadge({ status }: { readonly status: AgentStatus }) {
             status === "error"
               ? "bg-destructive"
               : isLive
-                ? "bg-accent-teal"
+                ? "bg-accent-turquoise"
                 : "bg-muted-foreground",
           )}
         />
@@ -304,8 +308,8 @@ function MetricTile({
           className={cn(
             "rounded-sm px-1.5 py-0.5 font-mono text-[11px]",
             positive
-              ? "bg-accent-teal/10 text-accent-teal"
-              : "bg-destructive/10 text-destructive",
+              ? "bg-accent-turquoise/10 text-accent-turquoise"
+              : "bg-accent-rose/10 text-accent-rose",
           )}
         >
           {comparison.percentChange === null

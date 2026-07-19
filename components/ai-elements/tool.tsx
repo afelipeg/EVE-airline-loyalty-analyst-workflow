@@ -85,7 +85,7 @@ export const ToolHeader = ({
     >
       <div className="flex items-center gap-2">
         {isRunning ? (
-          <Spinner className="size-4 text-accent-teal" />
+          <Spinner className="size-4 text-accent-blue" />
         ) : (
           <WrenchIcon className="size-4 text-muted-foreground" />
         )}

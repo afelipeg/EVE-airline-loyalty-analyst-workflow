@@ -250,9 +250,9 @@ function SandboxArtifactSummary({
   const stdout = readString(sandbox.stdout);
 
   return (
-    <div className="rounded-md border border-accent-teal/30 bg-accent-teal/5 p-3">
+    <div className="rounded-md border border-accent-blue/30 bg-accent-blue/5 p-3">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-teal/10 text-accent-teal">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-blue/10 text-accent-blue">
           <TerminalSquareIcon className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
@@ -276,7 +276,7 @@ function SandboxArtifactSummary({
                   className="flex min-w-0 items-center gap-2 rounded-sm bg-background/65 px-2 py-1 text-xs"
                   key={path}
                 >
-                  <FileCodeIcon className="size-3.5 shrink-0 text-accent-teal" />
+                  <FileCodeIcon className="size-3.5 shrink-0 text-accent-blue" />
                   <span className="truncate font-mono text-muted-foreground">
                     {path}
                   </span>

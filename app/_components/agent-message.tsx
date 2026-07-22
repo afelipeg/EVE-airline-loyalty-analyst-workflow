@@ -126,32 +126,35 @@ function AgentMessagePart({
       return <AuthorizationPrompt part={part} />;
     case "dynamic-tool":
       return (
-        <Tool
-          defaultOpen={
-            part.state === "approval-requested" ||
-            part.state === "approval-responded"
-          }
-        >
-          <ToolHeader
-            state={part.state}
-            title={part.toolName}
-            toolName={part.toolName}
-            type="dynamic-tool"
-          />
-          <ToolContent>
-            <ToolInput input={part.input} />
-            <InputRequestActions
-              canRespond={canRespond}
-              part={part}
-              onInputResponses={onInputResponses}
-            />
-            <SandboxArtifactSummary
-              output={part.output}
+        <div className="space-y-3">
+          <SandboxChart output={part.output} toolName={part.toolName} />
+          <Tool
+            defaultOpen={
+              part.state === "approval-requested" ||
+              part.state === "approval-responded"
+            }
+          >
+            <ToolHeader
+              state={part.state}
+              title={part.toolName}
               toolName={part.toolName}
+              type="dynamic-tool"
             />
-            <ToolOutput errorText={part.errorText} output={part.output} />
-          </ToolContent>
-        </Tool>
+            <ToolContent>
+              <ToolInput input={part.input} />
+              <InputRequestActions
+                canRespond={canRespond}
+                part={part}
+                onInputResponses={onInputResponses}
+              />
+              <SandboxArtifactSummary
+                output={part.output}
+                toolName={part.toolName}
+              />
+              <ToolOutput errorText={part.errorText} output={part.output} />
+            </ToolContent>
+          </Tool>
+        </div>
       );
   }
 }
@@ -224,6 +227,43 @@ function AuthorizationPrompt({
         </div>
       </div>
     </div>
+  );
+}
+
+function SandboxChart({
+  output,
+  toolName,
+}: {
+  readonly output: EveDynamicToolPart["output"];
+  readonly toolName: string;
+}) {
+  if (toolName !== "segment_members") {
+    return null;
+  }
+
+  // The tool returns the raw SVG in `chartSvg` (excluded from the model output
+  // by design — see sandbox-runner.ts). Render it inline as an <img> data URI
+  // so the chart shows in the chat instead of only its file path in the panel.
+  const record = asRecord(output);
+  const chartSvg = readString(record?.chartSvg);
+  if (!chartSvg) {
+    return null;
+  }
+
+  const title = readString(record?.title);
+  return (
+    <figure className="overflow-hidden rounded-md border border-border bg-white">
+      <img
+        alt={title ?? "Sandbox-generated segment chart"}
+        className="block h-auto w-full"
+        src={`data:image/svg+xml;utf8,${encodeURIComponent(chartSvg)}`}
+      />
+      {title ? (
+        <figcaption className="border-t border-border bg-background px-3 py-2 text-muted-foreground text-xs">
+          {title}
+        </figcaption>
+      ) : null}
+    </figure>
   );
 }
 

@@ -240,6 +240,29 @@ function SandboxArtifactSummary({
 
   const record = asRecord(output);
   const sandbox = asRecord(record?.sandbox);
+  if (sandbox?.used === false) {
+    // Surface a swallowed sandbox failure. Without this the tool returns tables
+    // but no chartSvg, so the chart silently vanishes and only a server-side
+    // console.error records why. Make the failure visible instead.
+    const reason =
+      readString(sandbox.reason) ??
+      "The Eve sandbox did not produce a chart for this run.";
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+            <XCircleIcon className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-sm">
+              Eve sandbox unavailable — chart not generated
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{reason}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (sandbox?.used !== true) {
     return null;
   }

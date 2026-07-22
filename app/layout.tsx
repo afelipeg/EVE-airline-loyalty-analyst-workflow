@@ -20,8 +20,8 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Club Premier Loyalty Analyst | Aeromexico",
-  description: "A runnable Eve analytics agent showcasing Vercel Agent Stack.",
+  title: "Loyalty Analyst",
+  description: "Explore customer behavior, loyalty segments and retention opportunities in a synthetic airline loyalty dataset. #AppliedAI #AgenticAI #VercelEVE #RevenueManagement",
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {

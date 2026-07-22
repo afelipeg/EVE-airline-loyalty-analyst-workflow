@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
 import { getDashboardSnapshot } from "@/agent/lib/aeromexico-data";
 import { AgentMessage } from "./agent-message";
 
-const AGENT_NAME = "Club Premier Analyst";
+const AGENT_NAME = "Loyalty Analyst";
 const snapshot = getDashboardSnapshot();
 
 const suggestions = [
@@ -89,7 +89,7 @@ export function AgentChat() {
     await agent.send({
       message: text,
       clientContext: {
-        demo: "Club Premier Eve Agent Stack walkthrough",
+        demo: "Loyalty Analyst Eve Agent Stack walkthrough",
         currentWeek: snapshot.currentWeek,
         previousWeek: snapshot.previousWeek,
       },
@@ -98,7 +98,7 @@ export function AgentChat() {
 
   const composer = (
     <PromptInput onSubmit={handleSubmit}>
-      <PromptInputTextarea placeholder="Ask the Club Premier Analyst about RASK, load factor, churn risk, or offers..." />
+      <PromptInputTextarea placeholder="Ask the Loyalty Analyst about RASK, load factor, churn risk, or offers..." />
       <PromptInputSubmit
         className="bg-accent-rose text-white hover:bg-accent-rose/90"
         onStop={agent.stop}
@@ -122,9 +122,9 @@ export function AgentChat() {
               <StatusBadge status={agent.status} />
             </div>
             <p className="mt-5 text-sm leading-6 text-muted-foreground">
-              A runnable Eve analyst that reads Club Premier loyalty data,
-              runs sandboxed analysis, delegates to specialist subagents, and
-              streams the durable run into this web channel.
+              Explore customer behavior, loyalty segments and retention
+              opportunities in a synthetic airline loyalty dataset — sandboxed
+              analysis, specialist subagents, and durable runs on Vercel Eve.
             </p>
           </section>
 
@@ -147,7 +147,7 @@ export function AgentChat() {
               <div>
                 <p className="eyebrow">Live Eve session</p>
                 <h2 className="mt-1 text-xl font-semibold tracking-normal">
-                  Ask the Club Premier Analyst anything about the two-week dataset
+                  Ask the Loyalty Analyst anything about the two-week dataset
                 </h2>
               </div>
               <Button
@@ -198,7 +198,7 @@ export function AgentChat() {
                   Start with the hero prompt from the video.
                 </h3>
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                  The Club Premier Analyst will query deterministic loyalty
+                  The Loyalty Analyst will query deterministic loyalty
                   data, run a sandboxed analysis step, delegate to specialist
                   subagents when needed, and return a recording-ready summary
                   with concrete dates.
@@ -369,7 +369,7 @@ function Timeline({
   if (isEmpty || visible.length === 0) {
     return (
       <div className="flex min-h-48 flex-1 items-center justify-center rounded-md border border-dashed border-border text-center text-sm text-muted-foreground">
-        Session events will appear here while the Club Premier Analyst works.
+        Session events will appear here while the Loyalty Analyst works.
       </div>
     );
   }
@@ -417,8 +417,8 @@ function toTimelineItem(
         eyebrow: "session",
         title: "Agent runtime online",
         detail: modelId
-          ? `Club Premier Analyst is running on ${modelId}.`
-          : "Club Premier Analyst opened a durable Eve session.",
+          ? `Loyalty Analyst is running on ${modelId}.`
+          : "Loyalty Analyst opened a durable Eve session.",
         meta: gitSha ? gitSha.slice(0, 7) : undefined,
         tone: "teal",
         icon: ActivityIcon,
@@ -473,7 +473,7 @@ function toTimelineItem(
         key,
         eyebrow: "subagent",
         title: `${label} delegated`,
-        detail: `Club Premier Analyst handed the analysis to the ${label}.`,
+        detail: `Loyalty Analyst handed the analysis to the ${label}.`,
         meta: readChildSession(event.data),
         tone: "gold",
         icon: BotIcon,
@@ -521,7 +521,7 @@ function toTimelineItem(
         title: "Final response ready",
         detail: truncate(
           readString(asRecord(event.data)?.message) ??
-            "Club Premier Analyst finished the answer.",
+            "Loyalty Analyst finished the answer.",
           110,
         ),
         tone: "teal",
@@ -532,7 +532,7 @@ function toTimelineItem(
         key,
         eyebrow: "ready",
         title: "Session parked",
-        detail: "Club Premier Analyst is waiting durably for the next turn.",
+        detail: "Loyalty Analyst is waiting durably for the next turn.",
         tone: "purple",
         icon: WorkflowIcon,
       };
@@ -730,7 +730,7 @@ function readToolResultDetail(data: unknown) {
   }
 
   if (name === "load_skill") {
-    return "Club Premier Analyst loaded metric definitions before answering.";
+    return "Loyalty Analyst loaded metric definitions before answering.";
   }
 
   if (name === "bash") {

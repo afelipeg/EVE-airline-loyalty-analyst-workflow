@@ -1,5 +1,5 @@
-import { AgentChat } from "@/app/_components/agent-chat";
+import { SuccessCommandCenter } from "@/app/_components/success-command-center";
 
 export default function Page() {
-  return <AgentChat />;
+  return <SuccessCommandCenter />;
 }

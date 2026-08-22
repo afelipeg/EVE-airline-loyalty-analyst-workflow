@@ -2,9 +2,7 @@ import { defineAgent } from "eve";
 
 export default defineAgent({
   description:
-    "Club Premier Loyalty Analyst — Lead. Unifies Aeromexico CRM/CDP/Rewards/Booking data, scores member " +
-    "value and churn, runs sandbox segmentation, and delegates to specialist subagents (crm-analyst, " +
-    "cdp-analyst, rewards-analyst, revenue-analyst, offer-strategist) to maximize revenue per fixed ASK.",
+    "Customer Success Command Center — Global CS orchestrator. Unifies portfolio health, product adoption, maintenance value realization, support friction, renewal exposure, and expansion readiness to prioritize interventions that protect GRR and compound NRR.",
   model: "anthropic/claude-sonnet-5",
   reasoning: "medium",
   compaction: {

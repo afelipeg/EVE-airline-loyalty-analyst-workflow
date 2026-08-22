@@ -1,132 +1,114 @@
-# Pulse: Vercel Eve Agent Stack Demo
+# Customer Success Command Center — Vercel Eve Interview MVP
 
-Pulse is the full demo app from the video script, "Vercel's Agent Stack
-explained." It is a runnable SaaS metrics analyst built with eve, Vercel AI
-Gateway, Vercel Sandbox, Vercel Workflow, Vercel Connect, and a Next.js web chat.
+An interview prototype for a Global Chief Success Officer / CX operating model. It uses Vercel Eve to turn product adoption, maintenance outcomes, support friction, relationship signals, renewals, and ARR economics into a prioritized Customer Success portfolio.
 
-Use this repo if you want to follow along with the video instead of just watching
-slides. Pulse can answer metrics questions, call tools, run Python in an isolated
-sandbox, delegate anomaly checks to a subagent, and run a scheduled weekly report.
+This is not a Fracttal maintenance copilot. Fracttal One already has AI capabilities for maintenance workflows. The prototype instead demonstrates the operating layer a global Customer Success leader needs above the product: where value is not being realized, which recurring revenue is exposed, which intervention should happen next, and where expansion is justified by proven value.
 
-## What You Need
+## Data policy
 
-- Node 24 or newer. This repo includes `.nvmrc`, so `nvm use` is enough if you
-  use nvm.
-- pnpm 11.7.0 or newer. The package manager version is declared in
-  `package.json`.
-- A Vercel project link or an AI Gateway API key. The model in `agent/agent.ts`
-  is a Gateway model string: `anthropic/claude-sonnet-5`.
-- Vercel CLI access if you want to use the Vercel Sandbox backend locally or wire
-  Slack through Vercel Connect.
+All account names and values in `agent/lib/fracttal-success-data.ts` are synthetic and deterministic. They do not represent actual Fracttal customers, contracts, usage, NPS, maintenance performance, ARR, or renewal dates.
 
-## Setup
+## Decision model
+
+The portfolio is scored across five executive dimensions:
+
+- **Health Score** — adoption + maintenance value + support friction + executive relationship.
+- **Churn Risk** — intervention heuristic derived from inverse health, renewal proximity, and critical support friction.
+- **Value Realization** — preventive maintenance compliance, preventive/corrective mix, work-order completion, MTTR improvement, and downtime reduction.
+- **ARR at Risk** — ARR weighted by the synthetic risk heuristic to prioritize leadership attention.
+- **Expansion Readiness** — value, adoption, asset coverage, and integration whitespace; expansion is blocked conceptually until value proof exists.
+
+Accounts fall into four operating motions:
+
+1. `Protect Now`
+2. `Accelerate Value`
+3. `Expand`
+4. `Scale`
+
+The governing doctrine is: **prove value, protect GRR, then compound NRR.**
+
+## Eve architecture
+
+The app keeps the strongest parts of the original Eve demo architecture:
+
+- filesystem-first agent configuration in `agent/`
+- AI Gateway model routing
+- durable Vercel Workflow-backed sessions
+- typed tools with Zod schemas
+- Vercel Sandbox capability for isolated analysis
+- declared subagents / specialist decomposition
+- Vercel Connect channel support
+- schedules for recurring executive reviews
+- evals for regression and behavioral guardrails
+- Next.js web chat with structured Eve events
+
+The first Fracttal-specific tool is `agent/tools/query_accounts.ts`. It grounds portfolio questions in deterministic source data and returns precomputed totals/shares so the model does not fabricate portfolio arithmetic.
+
+## Interview hero prompts
+
+```text
+Which accounts represent the largest ARR-at-risk in the next 90 days, why, and what should we do first?
+```
+
+```text
+Separate the portfolio into Protect Now, Accelerate Value, Expand, and Scale. Quantify the ARR in each motion.
+```
+
+```text
+Where do we have proven maintenance value and enough whitespace to build a responsible expansion motion?
+```
+
+```text
+Give me the Monday executive portfolio review: risk, renewals, value proof, expansion readiness, and the five actions requiring leadership attention.
+```
+
+## Production target architecture
+
+The synthetic data layer is deliberately replaceable. A production version would connect governed sources such as:
+
+```text
+Fracttal One telemetry / API / MCP
+          |
+CRM / contracts / renewals ---- Customer 360 ---- Support / CSAT / NPS
+          |                          |
+          +------ Value layer ------+
+                     |
+           Eve CS Orchestrator
+              /   |   |   \
+       adoption value risk renewal
+                     |
+             CS decision layer
+                     |
+        human approval for actions
+```
+
+The production agent should remain read-only by default. CRM changes, customer communication, entitlement changes, discounts, or commercial commitments should require explicit authorization / human approval.
+
+## Local setup
+
+Requirements:
+
+- Node 24+
+- pnpm 11.7+
+- Vercel project/OIDC or `AI_GATEWAY_API_KEY`
 
 ```bash
 nvm use
 pnpm install
 cp .env.example .env.local
-```
-
-Then choose one model-auth option:
-
-```bash
-# Option A: use Vercel OIDC from a linked project
-pnpm dlx vercel@latest link
-pnpm dlx vercel@latest env pull .env.local
-```
-
-```bash
-# Option B: use an AI Gateway key
-# Paste AI_GATEWAY_API_KEY into .env.local
-```
-
-Run the web demo:
-
-```bash
 pnpm dev
 ```
 
-Open `http://localhost:3000` and ask Pulse something like:
+Model configuration lives in `agent/agent.ts`.
 
-```txt
-How did signups do this week compared to last week?
-```
+## Weekly review
 
-## Optional Slack Demo
-
-The Slack channel is already authored in `agent/channels/slack.ts`. It uses
-Vercel Connect, so you do not need `SLACK_BOT_TOKEN` or `SLACK_SIGNING_SECRET`.
-
-By default the app looks for this connector UID:
-
-```txt
-slack/vercel-eve-bot
-```
-
-To use your own connector, set this in `.env.local` and in your Vercel project:
-
-```txt
-SLACK_CONNECTOR=slack/your-connector
-```
-
-The eve Slack docs cover the full Connect setup:
-
-```bash
-pnpm dlx vercel@latest connect create slack --triggers
-pnpm dlx vercel@latest connect attach <uid> --triggers --trigger-path /eve/v1/slack --yes
-```
-
-## What To Show In The Video
-
-- `agent/` is the filesystem-first eve agent.
-- `agent/agent.ts` picks the AI Gateway model and runtime limits.
-- `agent/instructions.md` gives Pulse its analyst behavior and demo framing.
-- `agent/tools/query_metrics.ts` reads the local SaaS metrics dataset.
-- `agent/tools/run_analysis.ts` runs chart-ready analysis through the sandbox.
-- `agent/sandbox/sandbox.ts` pins Vercel Sandbox with two vCPUs and `deny-all`
-  network egress for each session.
-- `agent/subagents/investigator/` is the specialist anomaly-review subagent.
-- `agent/schedules/monday-summary.ts` is the Monday weekly report prompt.
-- `agent/channels/slack.ts` shows the Vercel Connect-backed Slack channel.
-- `app/_components/agent-chat.tsx` is the recording-friendly web chat.
-
-## Trigger The Weekly Report Locally
-
-`eve dev` does not wait for cron. Trigger the same schedule path on demand:
-
-```bash
-pnpm dev
-```
-
-Then, in another terminal:
-
-```bash
-curl -X POST http://localhost:3000/eve/v1/dev/schedules/monday-summary
-```
-
-The route returns the started session IDs. You can watch the run in the web UI,
-terminal logs, or by streaming the session route.
-
-## Useful Commands
-
-```bash
-pnpm typecheck
-pnpm build
-pnpm build:eve
-pnpm dev:eve
-```
+`agent/schedules/weekly-success-review.ts` defines the Monday executive Customer Success review. In a production deployment the destination should be replaced by a governed CS leadership channel and connected to real customer sources.
 
 ## Deploy
-
-Deploy it like a normal Vercel app:
 
 ```bash
 VERCEL_USE_EXPERIMENTAL_FRAMEWORKS=1 pnpm dlx vercel@latest deploy
 ```
 
-Set `AI_GATEWAY_API_KEY` only if you are not using Vercel OIDC/Gateway auth for
-the deployment. Set `SLACK_CONNECTOR` if your connector UID is different from the
-demo default.
-
-Before using private customer data, replace the public demo auth in
-`agent/channels/eve.ts` with your real route or app auth policy.
+Before connecting private customer data, replace demo authorization policies, enforce tenant/account scope, validate Fracttal data permissions, and add human approval for any write-capable action.

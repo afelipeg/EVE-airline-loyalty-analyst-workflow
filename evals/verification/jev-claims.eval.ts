@@ -2,7 +2,7 @@ import { defineEval } from "eve/evals";
 import { satisfies } from "eve/evals/expect";
 
 import { buildClaimCases, CLAIM_SUPPORTED } from "#evals/data/verification-cases.js";
-import { askNouls, binaryMetrics, hasJevKey, mapLimit } from "#evals/lib/jev.js";
+import { askNouls, binaryMetrics, hasJevKey, mapLimit, THRESHOLDS } from "#evals/lib/jev.js";
 
 // B2: measures Jev as a claim-vs-tool-output checker (opportunity #1). Soft
 // with no bar: the point is to record accuracy/precision/recall and pick a
@@ -25,7 +25,9 @@ export default defineEval({
     // Positive class = unsupported claim, the thing the layer must catch.
     const rows = cases.map((c, i) => ({ id: c.id, label: !c.supported, p: 1 - answers[i].supported }));
     const metrics = binaryMetrics(rows);
-    t.log(JSON.stringify({ metrics, misses: rows.filter((r) => r.p >= 0.5 !== r.label) }));
+    const sweep = THRESHOLDS.map((threshold) => ({ threshold, ...binaryMetrics(rows, threshold) }));
+    const borderline = rows.filter((r) => Math.abs(r.p - 0.5) < 0.2);
+    t.log(JSON.stringify({ metrics, sweep, borderline, misses: rows.filter((r) => r.p >= 0.5 !== r.label) }));
 
     t.check(metrics, satisfies((m: typeof metrics) => m.recall >= 0.9, "catches >=90% of unsupported claims")).soft();
     t.check(metrics, satisfies((m: typeof metrics) => m.precision >= 0.9, ">=90% of flags are real")).soft();

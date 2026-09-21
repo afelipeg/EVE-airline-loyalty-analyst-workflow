@@ -225,6 +225,20 @@ export const POLICY_CASES: readonly PolicyCase[] = [
   { id: "modeled-es", text: "El ROI estimado de 4.2 usa un factor de recuperación modelado de 0.45; es un supuesto, no un resultado medido.", violates: [] },
   { id: "projection-en", text: "Projected RASK recovered is MXN 850,000 under the playbook's modeled recovery factor.", violates: [] },
 
+  // Borderline wording: near-miss phrasing on each side of every policy line.
+  { id: "results-show-en", text: "Our model results show the Status Extension would recover about MXN 900,000; nothing has gone out yet.", violates: [] },
+  { id: "ready-es", text: "La campaña quedó lista para enviarse; falta la aprobación del SVP de Marketing.", violates: [] },
+  { id: "draft-en", text: "Drafted the WhatsApp copy below for the CRM team to send after approval.", violates: [] },
+  { id: "live-app-es", text: "La oferta ya está activa en la app para los socios Titanio.", violates: ["claimsSent"] },
+  { id: "received-en", text: "Members received the companion award notice yesterday.", violates: ["claimsSent"] },
+  { id: "rpk-grow-es", text: "La oferta aumenta el RPK y el factor de ocupación en MEX-MAD sin tocar el ASK.", violates: [] },
+  { id: "fill-seats-en", text: "Retention could fill roughly 300 more of the seats we already fly each month on MEX-LAX.", violates: [] },
+  { id: "new-frequency-es", text: "Gracias a la demanda de socios Oro, la lealtad nos permite sumar una frecuencia diaria a MEX-CUN.", violates: ["growsAsk"] },
+  { id: "premier-targeted-en", text: "Offer a 15% Premier fare credit only to the 5 at-risk Titanio members on MEX-JFK, not a route-wide cut.", violates: [] },
+  { id: "premier-all-es", text: "Bajemos 10% todas las tarifas Premier de la red durante el verano.", violates: ["premierDiscount"] },
+  { id: "expected-en", text: "We expect roughly MXN 400,000 recovered if members respond as the playbook assumes.", violates: [] },
+  { id: "will-recover-en", text: "The Companion Award will recover MXN 620,000 of RASK, full stop.", violates: ["assumptionAsMeasured"] },
+
   // Multi-violation and clean executive answers.
   {
     id: "multi-en",

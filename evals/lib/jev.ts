@@ -49,6 +49,10 @@ export async function mapLimit<T, R>(
   return results;
 }
 
+// Candidate decision thresholds logged side by side, so a threshold is chosen
+// from this data rather than assumed.
+export const THRESHOLDS = [0.5, 0.6, 0.7] as const;
+
 export type Metrics = {
   readonly n: number;
   readonly accuracy: number;

@@ -2,10 +2,10 @@
 // percentages that passed (where scope errors were seen live), then the four
 // policy Nouls per paragraph (t2 showed dense multi-violation text dilutes a
 // whole-reply check). Jev steps are skipped without TYPESAFE_API_KEY.
-import { askNouls, hasJevKey, mapLimit } from "./jev.js";
-import { checkNumbers, type EvidenceCall, type NumberReport } from "./numbers.js";
-import { POLICY_CHECKS, POLICY_QUESTIONS, POLICY_THRESHOLDS, policyScores, type PolicyCheck } from "./policy.js";
-import { checkScope, type ScopeResult } from "./scope.js";
+import { askNouls, hasJevKey, mapLimit } from "./jev";
+import { checkNumbers, type EvidenceCall, type NumberReport } from "./numbers";
+import { POLICY_CHECKS, POLICY_QUESTIONS, POLICY_THRESHOLDS, policyScores, type PolicyCheck } from "./policy";
+import { checkScope, type ScopeResult } from "./scope";
 
 const MAX_SCOPE_CHECKS = 8;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEveAgent } from "eve/react";
+import { useState } from "react";
 import {
   ActivityIcon,
   AlertCircleIcon,
@@ -37,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getDashboardSnapshot } from "@/agent/lib/aeromexico-data";
 import { AgentMessage } from "./agent-message";
+import { JevPanel, useJevReports } from "./jev-panel";
 
 const AGENT_NAME = "Loyalty Analyst";
 const snapshot = getDashboardSnapshot();
@@ -76,6 +78,9 @@ export function AgentChat() {
   const agent = useEveAgent();
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
   const isEmpty = agent.data.messages.length === 0;
+  const jev = useJevReports(agent.events as readonly StreamEvent[], agent.status === "ready");
+  const [panel, setPanel] = useState<"jev" | "metrics">("jev");
+  const showJev = jev !== null && panel === "jev";
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
@@ -129,15 +134,34 @@ export function AgentChat() {
           </section>
 
           <section className="dashboard-panel shrink-0 p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <DatabaseIcon className="size-4 text-accent-blue" />
-              <h2 className="section-title">Metrics Snapshot</h2>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {showJev ? (
+                  <ShieldCheckIcon className="size-4 text-accent-turquoise" />
+                ) : (
+                  <DatabaseIcon className="size-4 text-accent-blue" />
+                )}
+                <h2 className="section-title">{showJev ? "Jev Evaluation" : "Metrics Snapshot"}</h2>
+              </div>
+              {jev ? (
+                <button
+                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setPanel(panel === "jev" ? "metrics" : "jev")}
+                  type="button"
+                >
+                  {panel === "jev" ? "Metrics" : "Jev"}
+                </button>
+              ) : null}
             </div>
-            <div className="grid gap-3">
-              {snapshot.comparisons.map((comparison) => (
-                <MetricTile key={comparison.metric} comparison={comparison} />
-              ))}
-            </div>
+            {showJev && jev ? (
+              <JevPanel state={jev} />
+            ) : (
+              <div className="grid gap-3">
+                {snapshot.comparisons.map((comparison) => (
+                  <MetricTile key={comparison.metric} comparison={comparison} />
+                ))}
+              </div>
+            )}
           </section>
         </aside>
 

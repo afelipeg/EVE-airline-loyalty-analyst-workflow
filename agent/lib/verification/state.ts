@@ -2,7 +2,7 @@
 // on different workflow steps, so evidence lives in eve state, not memory.
 import { defineState } from "eve/context";
 
-import type { EvidenceCall } from "./numbers.js";
+import type { EvidenceCall } from "./numbers";
 
 export const turnEvidence = defineState("verify-reply.turn", () => ({
   inputs: {} as Record<string, unknown>,

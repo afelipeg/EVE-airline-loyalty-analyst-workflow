@@ -2,7 +2,7 @@
 // instructions.md and the offer playbook. Run per paragraph, all four in one
 // request (same state). Thresholds come from the t2/t3 sweeps in evals/:
 // airline-exec answers favor catching violations, within what the data held.
-import type { NoulQuestion } from "./jev.js";
+import type { NoulQuestion } from "./jev";
 
 export const POLICY_QUESTIONS = {
   growsAsk: {

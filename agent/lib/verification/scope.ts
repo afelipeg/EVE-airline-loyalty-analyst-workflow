@@ -7,8 +7,8 @@
 // almost always). It only reads the claim: two Choices over the same state pick
 // which population and which entity the claim names, from options built here
 // out of the tool call. Code then compares those picks with the source.
-import { askChoice, type ChoiceQuestion } from "./jev.js";
-import type { EvidenceCall, FigureResult } from "./numbers.js";
+import { askChoice, type ChoiceQuestion } from "./jev";
+import type { EvidenceCall, FigureResult } from "./numbers";
 
 // Act on a pick only when P >= 0.7. Probabilities, not confidence: confidence
 // measures how concentrated the distribution is, not correctness.

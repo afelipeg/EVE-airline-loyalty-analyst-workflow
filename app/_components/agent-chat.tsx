@@ -80,7 +80,7 @@ export function AgentChat() {
   const isEmpty = agent.data.messages.length === 0;
   const jev = useJevReports(agent.events as readonly StreamEvent[], agent.status === "ready");
   const [panel, setPanel] = useState<"jev" | "metrics">("jev");
-  const showJev = jev !== null && panel === "jev";
+  const showJev = panel === "jev";
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
@@ -143,17 +143,15 @@ export function AgentChat() {
                 )}
                 <h2 className="section-title">{showJev ? "Jev Evaluation" : "Metrics Snapshot"}</h2>
               </div>
-              {jev ? (
-                <button
-                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
-                  onClick={() => setPanel(panel === "jev" ? "metrics" : "jev")}
-                  type="button"
-                >
-                  {panel === "jev" ? "Metrics" : "Jev"}
-                </button>
-              ) : null}
+              <button
+                className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={() => setPanel(panel === "jev" ? "metrics" : "jev")}
+                type="button"
+              >
+                {panel === "jev" ? "Metrics" : "Jev"}
+              </button>
             </div>
-            {showJev && jev ? (
+            {showJev ? (
               <JevPanel state={jev} />
             ) : (
               <div className="grid gap-3">

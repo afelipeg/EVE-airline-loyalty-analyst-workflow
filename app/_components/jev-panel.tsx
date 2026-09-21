@@ -106,7 +106,15 @@ export function useJevReports(events: readonly StreamEvent[], idle: boolean) {
   return state;
 }
 
-export function JevPanel({ state }: { readonly state: NonNullable<ReturnType<typeof useJevReports>> }) {
+export function JevPanel({ state }: { readonly state: ReturnType<typeof useJevReports> }) {
+  if (!state) {
+    return (
+      <p className="text-sm leading-6 text-muted-foreground">
+        Ask a question. When the turn finishes, Jev scores the Lead&apos;s answer and each subagent&apos;s reasoning:
+        figures backed by tool output, scope, and the four loyalty policies.
+      </p>
+    );
+  }
   if (state.loading) return <p className="text-sm text-muted-foreground">Jev is evaluating the last turn…</p>;
   if (state.error) return <p className="text-sm text-accent-rose">Jev evaluation failed: {state.error}</p>;
   if (state.reports.length === 0) return <p className="text-sm text-muted-foreground">No final reply to evaluate yet.</p>;

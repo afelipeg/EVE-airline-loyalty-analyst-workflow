@@ -220,7 +220,7 @@ export const SIMULATED_REPLIES: readonly SimulatedReply[] = [
       },
       {
         text: "Top offer by ROI is Status Extension + Double Puntos at 96.87, followed by Dormant Elite Reactivation at 19.74.",
-        violates: [],
+        violates: ["assumptionAsMeasured"],
         claims: [ok("Status Extension has an ROI of 96.87.", "offers"), ok("Dormant Elite Reactivation has an ROI of 19.74.", "offers")],
       },
       { text: "These ROI figures are modeled from the playbook's recovery factors, not measured outcomes.", violates: [] },
@@ -275,7 +275,7 @@ export const SIMULATED_REPLIES: readonly SimulatedReply[] = [
       },
       {
         text: "That is MXN 14,803 recovered per targeted member.",
-        violates: [],
+        violates: ["assumptionAsMeasured"],
         claims: [bad("Dormant Elite Reactivation recovers MXN 14,803 per targeted member.", "offers")],
       },
     ],
@@ -323,7 +323,7 @@ export const SIMULATED_REPLIES: readonly SimulatedReply[] = [
     paragraphs: [
       {
         text: "The Status Extension offer ranks first at ROI 96.87 for 2 members.",
-        violates: [],
+        violates: ["assumptionAsMeasured"],
         claims: [ok("Status Extension has an ROI of 96.87.", "offers"), ok("Status Extension targets 2 members.", "offers")],
       },
       {

@@ -3,8 +3,9 @@ import { satisfies } from "eve/evals/expect";
 
 import { REAL_REPLIES } from "#evals/data/captured-labels.js";
 import { buildReplyEvidence, SIMULATED_REPLIES } from "#evals/data/simulated-replies.js";
-import { CLAIM_SUPPORTED, POLICY_CHECKS, type PolicyCheck } from "#evals/data/verification-cases.js";
+import { CLAIM_SUPPORTED, POLICY_CHECKS, POLICY_QUESTIONS, policyScores } from "#evals/data/verification-cases.js";
 import { askNouls, binaryMetrics, hasJevKey, mapLimit, THRESHOLDS } from "#evals/lib/jev.js";
+import { POLICY_THRESHOLDS } from "#lib/verification/policy.js";
 
 // t3: the same Jev questions as B2/B3, run on full agent replies split into
 // paragraphs (policy) and numeric sentences (claims), the granularity t2
@@ -31,26 +32,27 @@ export default defineEval({
       ),
     );
 
-    const policy = await mapLimit(paragraphs, 4, (p) => askNouls({ text: p.text }, POLICY_CHECKS));
+    const policy = await mapLimit(paragraphs, 4, (p) => askNouls({ text: p.text }, POLICY_QUESTIONS).then(policyScores));
     const support = await mapLimit(claims, 4, (c) =>
       askNouls({ evidence: c.evidenceValue, claim: c.text }, { supported: CLAIM_SUPPORTED }),
     );
 
-    const report = (name: string, rows: { id: string; source: string; label: boolean; p: number }[]) => {
-      const metrics = binaryMetrics(rows);
+    const report = (name: string, rows: { id: string; source: string; label: boolean; p: number }[], threshold = 0.5) => {
+      const metrics = binaryMetrics(rows, threshold);
       const bySource = Object.fromEntries(
-        ["sim", "real"].map((s) => [s, binaryMetrics(rows.filter((r) => r.source === s))]),
+        ["sim", "real"].map((s) => [s, binaryMetrics(rows.filter((r) => r.source === s), threshold)]),
       );
       const sweep = THRESHOLDS.map((threshold) => ({ threshold, ...binaryMetrics(rows, threshold) }));
-      const misses = rows.filter((r) => r.p >= 0.5 !== r.label);
+      const misses = rows.filter((r) => r.p >= threshold !== r.label);
       t.log(JSON.stringify({ check: name, metrics, bySource, sweep, misses }));
       t.check(metrics, satisfies((m: typeof metrics) => m.accuracy >= 0.9, `${name}: accuracy >= 90%`)).soft();
     };
 
-    for (const check of Object.keys(POLICY_CHECKS) as PolicyCheck[]) {
+    for (const check of POLICY_CHECKS) {
       report(
         check,
         paragraphs.map((p, i) => ({ id: p.id, source: p.source, label: p.violates.includes(check), p: policy[i][check] })),
+        POLICY_THRESHOLDS[check],
       );
     }
     // Positive class = unsupported claim.

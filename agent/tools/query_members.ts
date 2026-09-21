@@ -57,7 +57,20 @@ export default defineTool({
     const share = (part: number, whole: number) =>
       whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10;
 
+    // Shares below are computed within the filtered set. A live answer quoted
+    // a 100% share from a segment-filtered call as "100% of the whole base"
+    // (the base-wide figure was 23.0%), so the scope is stated, not implied.
+    const appliedFilters = Object.entries({ tier, hub, route, segment, minValueScore, minChurnRisk })
+      .filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0))
+      .map(([key, value]) => `${key}=${Array.isArray(value) ? value.join("|") : value}`);
+    const scope =
+      appliedFilters.length === 0
+        ? `Whole base: all ${allMembers.length} members. Shares are of the whole base.`
+        : `Filtered (${appliedFilters.join(", ")}): ${filtered.length} of ${allMembers.length} members. ` +
+          "Shares and totals are WITHIN this filtered set, not of the whole base.";
+
     const rollup = {
+      scope,
       matchedMembers: filtered.length,
       totalMembers: allMembers.length,
       totalRaskAtRiskMxn: Math.round(totalRaskAtRiskMxn),

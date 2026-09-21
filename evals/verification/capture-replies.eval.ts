@@ -32,11 +32,19 @@ export default QUESTIONS.map((question, index) =>
       const turn = await t.send(question);
       t.succeeded();
 
+      // Subagent outputs, read the same way the verify-reply hook sees them.
+      const subagentResults = turn.events.flatMap((e) =>
+        e.type === "action.result" && e.data.result.kind === "subagent-result"
+          ? [{ name: e.data.result.subagentName, output: e.data.result.output }]
+          : [],
+      );
       const id = `real-${String(index).padStart(2, "0")}`;
-      await mkdir("evals/data/captured", { recursive: true });
+      // CAPTURE_DIR lets a re-capture land beside the labeled set, not over it.
+      const dir = process.env.CAPTURE_DIR ?? "evals/data/captured";
+      await mkdir(dir, { recursive: true });
       await writeFile(
-        `evals/data/captured/${id}.json`,
-        JSON.stringify({ id, question, reply: t.reply, toolCalls: turn.toolCalls }, null, 2),
+        `${dir}/${id}.json`,
+        JSON.stringify({ id, question, reply: t.reply, toolCalls: turn.toolCalls, subagentResults }, null, 2),
       );
     },
   }),

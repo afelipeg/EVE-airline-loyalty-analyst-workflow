@@ -166,6 +166,17 @@ export default defineTool({
         );
         const incentiveCostMxn = archetype.costPerMemberMxn * group.length;
         const roi = incentiveCostMxn === 0 ? 0 : Math.round((raskRecoveredMxn / incentiveCostMxn) * 100) / 100;
+        // Per-member figures, so the subagent quotes them instead of deriving
+        // them in prose (live replies computed per-member ROI themselves).
+        const perMember = group.map((member) => {
+          const memberRecovered = Math.round(member[archetype.recoveryBase] * archetype.recoveryFactor);
+          return {
+            memberId: member.memberId,
+            estimatedRaskRecoveredMxn: memberRecovered,
+            incentiveCostMxn: archetype.costPerMemberMxn,
+            roi: Math.round((memberRecovered / archetype.costPerMemberMxn) * 100) / 100,
+          };
+        });
 
         return {
           archetype: archetype.name,
@@ -175,6 +186,7 @@ export default defineTool({
           estimatedRaskRecoveredMxn: raskRecoveredMxn,
           incentiveCostMxn,
           roi,
+          perMember,
           rationale: archetype.rationale(group.length),
         };
       })
@@ -190,6 +202,7 @@ export default defineTool({
       notes: [
         "ASK is fixed network capacity; these offers move RPK, load factor, yield, and RASK, never ASK.",
         "recoveryFactor and costPerMemberMxn are modeled assumptions from the offer playbook, not measured outcomes.",
+        "Quote per-member figures from `perMember`; do not derive them from the group totals.",
       ],
     };
   },

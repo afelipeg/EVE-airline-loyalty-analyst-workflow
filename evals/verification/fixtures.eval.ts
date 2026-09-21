@@ -1,7 +1,7 @@
 import { defineEval } from "eve/evals";
 import { satisfies } from "eve/evals/expect";
 
-import { buildClaimCases, POLICY_CASES, POLICY_CHECKS, type PolicyCheck } from "#evals/data/verification-cases.js";
+import { buildClaimCases, POLICY_CASES, POLICY_CHECKS } from "#evals/data/verification-cases.js";
 
 // Integrity gate for the B2/B3 verification sets: zero model tokens, no
 // TypeSafe key needed. A set with duplicate ids, no negatives, or a "mutated"
@@ -21,7 +21,7 @@ export default defineEval({
       ),
     );
 
-    const checks = Object.keys(POLICY_CHECKS) as PolicyCheck[];
+    const checks = POLICY_CHECKS;
     t.check(
       POLICY_CASES,
       satisfies(

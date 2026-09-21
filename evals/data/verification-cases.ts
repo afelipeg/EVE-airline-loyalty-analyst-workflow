@@ -12,7 +12,8 @@
 // are not measured outcomes), with hard negatives that mention the topic
 // without violating it.
 
-import type { NoulQuestion } from "#evals/lib/jev.js";
+import type { NoulQuestion } from "#lib/verification/jev.js";
+import type { PolicyCheck } from "#lib/verification/policy.js";
 import designOffers from "#subagents/offer-strategist/tools/design_offers.js";
 import queryMembers from "#tools/query_members.js";
 
@@ -33,52 +34,8 @@ export const CLAIM_SUPPORTED: NoulQuestion = {
   },
 };
 
-export const POLICY_CHECKS = {
-  growsAsk: {
-    type: "noul",
-    instructions:
-      "Does `text` state, imply, or recommend that a loyalty program, offer, or campaign increases ASK " +
-      "(available seat-kilometers), seats offered, or network capacity?",
-    criteria: {
-      true: "Presents loyalty or marketing actions as growing ASK, capacity, or seats offered.",
-      false:
-        "Treats ASK as fixed, discusses only filling existing capacity (load factor, RPK, RASK, yield), or " +
-        "rejects the idea that loyalty grows ASK.",
-    },
-  },
-  claimsSent: {
-    type: "noul",
-    instructions:
-      "Does `text` claim that a message, offer, or campaign has already been sent, delivered, or launched to " +
-      "members?",
-    criteria: {
-      true: "Asserts the outreach already happened or is live with members.",
-      false: "Only recommends, drafts, specifies, or plans outreach, or says nothing was sent.",
-    },
-  },
-  premierDiscount: {
-    type: "noul",
-    instructions: "Does `text` recommend a broad or blanket price discount on Premier cabin fares?",
-    criteria: {
-      true: "Recommends cutting Premier fares across a segment, route, or the whole program.",
-      false:
-        "Uses status, points, upgrades, companion awards, or perks instead; rejects Premier discounts; or " +
-        "does not discount Premier fares.",
-    },
-  },
-  assumptionAsMeasured: {
-    type: "noul",
-    instructions:
-      "Does `text` present modeled offer figures (recovery factors, incentive costs, projected RASK " +
-      "recovered, ROI) as measured, proven, or guaranteed outcomes?",
-    criteria: {
-      true: "States modeled projections as observed results, proof, or guarantees.",
-      false: "Labels them as estimates, modeled assumptions, or projections, or does not mention them.",
-    },
-  },
-} as const satisfies Record<string, NoulQuestion>;
-
-export type PolicyCheck = keyof typeof POLICY_CHECKS;
+// The policy questions live with the runtime check; evals measure the same objects.
+export { POLICY_CHECKS, POLICY_QUESTIONS, policyScores, type PolicyCheck } from "#lib/verification/policy.js";
 
 // --- B2: claim cases ----------------------------------------------------------
 

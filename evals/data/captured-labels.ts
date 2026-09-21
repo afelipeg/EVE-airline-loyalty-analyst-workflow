@@ -118,12 +118,12 @@ const LABELS: readonly { readonly id: string; readonly paragraphs: readonly Repl
       },
       {
         text: "CP10000006: costo 600 MXN → recupera hasta 76,077 MXN de RASK → ROI ~126.8x. CP10000008: costo 600 MXN → recupera hasta 40,171 MXN de RASK → ROI ~67.0x.",
-        violates: [],
+        violates: ["assumptionAsMeasured"],
         claims: [bad("CP10000006 tiene un ROI de ~126.8x con una recuperación de 76,077 MXN."), bad("CP10000008 tiene un ROI de ~67.0x con una recuperación de 40,171 MXN.")],
       },
       {
         text: "Costo total del programa: 2,700 MXN | RASK \"techo\" combinado: hasta 193,747 MXN de los 258,328 MXN en riesgo (~75%).",
-        violates: [],
+        violates: ["assumptionAsMeasured"],
         claims: [bad("El RASK techo combinado es 193,747 MXN, ~75% de los 258,328 MXN en riesgo.")],
       },
       {

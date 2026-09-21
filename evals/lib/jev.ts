@@ -1,60 +1,7 @@
-// Minimal TypeSafe System One client for evals: plain fetch against the HTTP
-// API, so measuring Jev adds no dependency to the app. The key stays in the
-// eval process (TYPESAFE_API_KEY) and is never sent anywhere but TypeSafe.
+// Eval-side helpers for measuring Jev. The client itself is the runtime one in
+// agent/lib/verification, so evals measure exactly what the hook runs.
 
-export type NoulQuestion = {
-  readonly type: "noul";
-  readonly instructions: string;
-  readonly criteria: { readonly true: string; readonly false: string };
-};
-
-export const hasJevKey = (): boolean => Boolean(process.env.TYPESAFE_API_KEY);
-
-export async function askNouls<K extends string>(
-  state: unknown,
-  questions: Record<K, NoulQuestion>,
-): Promise<Record<K, number>> {
-  // Retry 429/5xx with backoff: a sweep of ~200 requests hit a transient 503.
-  let response: Response;
-  for (let attempt = 1; ; attempt++) {
-    response = await fetch("https://api.typesafe.ai/v1/systemone", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.TYPESAFE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ state, model: "jev-latest", questions }),
-    });
-    const retryable = response.status === 429 || response.status >= 500;
-    if (!retryable || attempt === 3) break;
-    await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
-  }
-  if (!response.ok) throw new Error(`TypeSafe ${response.status}: ${await response.text()}`);
-
-  const body = (await response.json()) as { answers: Record<string, { noul: number }> };
-  const out = {} as Record<K, number>;
-  for (const key of Object.keys(questions) as K[]) out[key] = body.answers[key].noul;
-  return out;
-}
-
-// Order-preserving map with bounded concurrency, so a dataset sweep doesn't
-// burst the API.
-export async function mapLimit<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
+export { askChoice, askNouls, hasJevKey, mapLimit, type NoulQuestion } from "#lib/verification/jev.js";
 
 // Candidate decision thresholds logged side by side, so a threshold is chosen
 // from this data rather than assumed.

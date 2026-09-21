@@ -1,16 +1,17 @@
 "use client";
 
 import { Client } from "eve/client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import type { EvidenceCall } from "@/agent/lib/verification/numbers";
+import { POLICY_CHECKS, POLICY_THRESHOLDS, type PolicyCheck } from "@/agent/lib/verification/policy";
 import type { VerifyReport } from "@/agent/lib/verification/verify";
 
 type StreamEvent = { readonly type: string; readonly data?: unknown };
 type Rec = Record<string, unknown>;
 type JevItem = { readonly agent: string; readonly reply: string; readonly calls: EvidenceCall[] };
-export type JevReport = { readonly agent: string; readonly report: VerifyReport };
+type Entry = { readonly agent: string; readonly status: "evaluating" | "done" | "error"; readonly report?: VerifyReport };
 
 const LABELS: Record<string, string> = {
   pulse: "Lead",
@@ -21,60 +22,42 @@ const LABELS: Record<string, string> = {
   "offer-strategist": "Offer Strategist",
 };
 
-const CHECK_LABELS: Record<string, string> = {
-  growsAsk: "Implies loyalty grows ASK",
-  claimsSent: "Claims something was sent",
+const CHECK_LABELS: Record<PolicyCheck, string> = {
+  growsAsk: "Loyalty grows ASK",
+  claimsSent: "Claims it was sent",
   premierDiscount: "Blanket Premier discount",
-  assumptionAsMeasured: "Projection stated as fact",
+  assumptionAsMeasured: "Projection as fact",
 };
 
-// Rebuilds, for the latest turn, what each agent said and the evidence it had,
-// mirroring the verify-reply hook: tool/subagent results (with the inputs from
-// actions.requested), loaded skills, and the incoming brief. Each specialist is
-// scored on its own child session, so its reasoning is evaluated separately.
-export function buildJevItems(events: readonly StreamEvent[]) {
-  const start = events.findLastIndex((e) => e.type === "turn.started");
-  const turn = start === -1 ? events : events.slice(start);
-
-  const collect = (stream: readonly StreamEvent[], agent: string): JevItem | null => {
-    const inputs: Rec = {};
-    const calls: EvidenceCall[] = [];
-    let reply = "";
-    for (const e of stream) {
-      const d = (e.data ?? {}) as Rec;
-      if (e.type === "message.received") calls.push({ tool: "message.received", output: d.message });
-      if (e.type === "actions.requested") {
-        for (const a of (d.actions ?? []) as Rec[]) if (a.kind === "tool-call") inputs[String(a.callId)] = a.input;
-      }
-      if (e.type === "action.result") {
-        const r = (d.result ?? {}) as Rec;
-        if (r.isError) continue;
-        const tool = String(r.toolName ?? r.subagentName ?? r.name ?? "load_skill");
-        calls.push({ tool, input: inputs[String(r.callId)], output: r.output });
-      }
-      if (e.type === "message.completed" && (d.finishReason === "stop" || d.finishReason === "length")) {
-        reply = String(d.message ?? "");
-      }
+// What an agent said in one turn and the evidence it had, mirroring the
+// verify-reply hook: tool/subagent results (inputs from actions.requested),
+// loaded skills, and the incoming brief.
+function collect(stream: readonly StreamEvent[], agent: string): JevItem | null {
+  const inputs: Rec = {};
+  const calls: EvidenceCall[] = [];
+  let reply = "";
+  for (const e of stream) {
+    const d = (e.data ?? {}) as Rec;
+    if (e.type === "message.received") calls.push({ tool: "message.received", output: d.message });
+    if (e.type === "actions.requested") {
+      for (const a of (d.actions ?? []) as Rec[]) if (a.kind === "tool-call") inputs[String(a.callId)] = a.input;
     }
-    return reply ? { agent, reply, calls } : null;
-  };
-
-  const lead = collect(turn, "pulse");
-  if (!lead) return null;
-
-  // The parent stream carries only subagent.called/completed; each specialist's
-  // own reasoning lives in its child session, read separately below.
-  const children = turn
-    .filter((e) => e.type === "subagent.called")
-    .map((e) => e.data as { childSessionId?: string; name: string })
-    .filter((d): d is { childSessionId: string; name: string } => Boolean(d.childSessionId));
-
-  return { key: `${events.length}:${lead.reply.length}`, lead, children, collect };
+    if (e.type === "action.result") {
+      const r = (d.result ?? {}) as Rec;
+      if (r.isError) continue;
+      calls.push({ tool: String(r.toolName ?? r.subagentName ?? r.name ?? "load_skill"), input: inputs[String(r.callId)], output: r.output });
+    }
+    if (e.type === "message.completed" && (d.finishReason === "stop" || d.finishReason === "length")) {
+      reply = String(d.message ?? "");
+    }
+  }
+  return reply ? { agent, reply, calls } : null;
 }
 
 const client = new Client({ host: "" });
 
-// Reads a finished child session's stream from the start, same origin.
+// The parent stream carries only subagent.called/completed; a specialist's own
+// reasoning lives in its child session, read here once it has completed.
 async function readChild(sessionId: string): Promise<StreamEvent[]> {
   const events: StreamEvent[] = [];
   for await (const event of client.session({ sessionId, streamIndex: 0 }).stream()) {
@@ -84,78 +67,159 @@ async function readChild(sessionId: string): Promise<StreamEvent[]> {
   return events;
 }
 
-// Evaluates each completed turn once, after the stream settles.
-export function useJevReports(events: readonly StreamEvent[], idle: boolean) {
-  const [state, setState] = useState<{ key: string; loading: boolean; reports: JevReport[]; error?: string } | null>(null);
-
-  useEffect(() => {
-    if (!idle) return;
-    const built = buildJevItems(events);
-    if (!built || built.key === state?.key) return;
-    setState({ key: built.key, loading: true, reports: [] });
-    Promise.all(built.children.map(async (c) => built.collect(await readChild(c.childSessionId), c.name)))
-      .then((subagents) => {
-        const items = [built.lead, ...subagents.filter((i): i is JevItem => i !== null)];
-        return fetch("/api/jev", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
-      })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((body: { reports: JevReport[] }) => setState({ key: built.key, loading: false, reports: body.reports }))
-      .catch((error: Error) => setState({ key: built.key, loading: false, reports: [], error: error.message }));
-  }, [events, idle, state?.key]);
-
-  return state;
+async function evaluate(item: JevItem): Promise<VerifyReport> {
+  const response = await fetch("/api/jev", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items: [item] }),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const body = (await response.json()) as { reports: { report: VerifyReport }[] };
+  return body.reports[0].report;
 }
 
-export function JevPanel({ state }: { readonly state: ReturnType<typeof useJevReports> }) {
-  if (!state) {
+// Live: each subagent is evaluated as soon as its subagent.completed arrives;
+// the Lead once the turn settles. Entries reset on every new turn.
+export function useJevReports(events: readonly StreamEvent[], idle: boolean) {
+  const [entries, setEntries] = useState<Record<string, Entry>>({});
+  const started = useRef<{ turn: number; keys: Set<string> }>({ turn: -1, keys: new Set() });
+
+  useEffect(() => {
+    const turnStart = events.findLastIndex((e) => e.type === "turn.started");
+    if (turnStart === -1) return;
+    if (started.current.turn !== turnStart) {
+      started.current = { turn: turnStart, keys: new Set() };
+      setEntries({});
+    }
+    const turn = events.slice(turnStart);
+    const run = (key: string, agent: string, load: () => Promise<JevItem | null>) => {
+      if (started.current.keys.has(key)) return;
+      started.current.keys.add(key);
+      setEntries((prev) => ({ ...prev, [key]: { agent, status: "evaluating" } }));
+      load()
+        .then((item) => (item ? evaluate(item) : Promise.reject(new Error("no reply"))))
+        .then((report) => setEntries((prev) => ({ ...prev, [key]: { agent, status: "done", report } })))
+        .catch(() => setEntries((prev) => ({ ...prev, [key]: { agent, status: "error" } })));
+    };
+
+    const children = new Map<string, { name: string; childSessionId?: string }>();
+    for (const e of turn) {
+      const d = (e.data ?? {}) as Rec;
+      if (e.type === "subagent.called") children.set(String(d.callId), { name: String(d.name), childSessionId: d.childSessionId as string | undefined });
+      if (e.type === "subagent.completed") {
+        const child = children.get(String(d.callId));
+        if (child?.childSessionId) run(String(d.callId), child.name, async () => collect(await readChild(child.childSessionId!), child.name));
+      }
+    }
+    // A turn parked on a question to the user has no final reply to score.
+    const lead = idle ? collect(turn, "pulse") : null;
+    if (lead) run("lead", "pulse", async () => lead);
+  }, [events, idle]);
+
+  return Object.values(entries);
+}
+
+export function JevPanel({ entries }: { readonly entries: readonly Entry[] }) {
+  if (entries.length === 0) {
     return (
       <p className="text-sm leading-6 text-muted-foreground">
-        Ask a question. When the turn finishes, Jev scores the Lead&apos;s answer and each subagent&apos;s reasoning:
+        Ask a question. As each subagent finishes reasoning, Jev scores it here, then the Lead&apos;s final answer:
         figures backed by tool output, scope, and the four loyalty policies.
       </p>
     );
   }
-  if (state.loading) return <p className="text-sm text-muted-foreground">Jev is evaluating the last turn…</p>;
-  if (state.error) return <p className="text-sm text-accent-rose">Jev evaluation failed: {state.error}</p>;
-  if (state.reports.length === 0) return <p className="text-sm text-muted-foreground">No final reply to evaluate yet.</p>;
+  const counts = { pass: 0, review: 0, flag: 0 };
+  for (const e of entries) if (e.report) counts[verdict(e.report)]++;
 
   return (
     <div className="grid gap-3">
-      {state.reports.map(({ agent, report }) => (
-        <JevAgentTile agent={agent} key={agent} report={report} />
+      <div className="grid grid-cols-3 gap-2 text-center font-mono text-[11px]">
+        <span className="rounded-sm bg-accent-turquoise/10 py-1 text-accent-turquoise">{counts.pass} pass</span>
+        <span className="rounded-sm bg-accent-gold/10 py-1 text-accent-gold">{counts.review} review</span>
+        <span className="rounded-sm bg-accent-rose/10 py-1 text-accent-rose">{counts.flag} flag</span>
+      </div>
+      {entries.map((entry, i) => (
+        <JevAgentTile entry={entry} key={`${entry.agent}-${i}`} />
       ))}
       <p className="text-[11px] leading-4 text-muted-foreground">
-        Observe-only: agents reason, Jev evaluates. Figures are checked against this turn&apos;s tool and subagent
-        output; scope and policies are Jev judgments.
+        Agents reason, Jev evaluates (observe-only). Figures are checked against each agent&apos;s own tool output;
+        scope and policies are Jev probabilities.
       </p>
     </div>
   );
 }
 
-function JevAgentTile({ agent, report }: { readonly agent: string; readonly report: VerifyReport }) {
-  const unsupported = report.numbers.misses.length + report.numbers.unknownIds.length;
-  const scopeFlags = report.scope.filter((s) => s.flag);
+type Verdict = "pass" | "review" | "flag";
+
+// flag: a check crossed its threshold; review: a policy sits within 0.2 of it
+// or a scope is unclear; pass: neither.
+function verdict(report: VerifyReport): Verdict {
+  if (!report.pass && (report.numbers.misses.length > 0 || report.policy.length > 0 || report.scope.some((s) => s.flag === "differs"))) {
+    return "flag";
+  }
+  const near = POLICY_CHECKS.some((c) => report.policyMax[c] >= POLICY_THRESHOLDS[c] - 0.2);
+  return near || report.scope.some((s) => s.flag === "unclear") ? "review" : "pass";
+}
+
+const VERDICT_STYLE: Record<Verdict, string> = {
+  pass: "bg-accent-turquoise/10 text-accent-turquoise",
+  review: "bg-accent-gold/10 text-accent-gold",
+  flag: "bg-accent-rose/10 text-accent-rose",
+};
+
+function JevAgentTile({ entry }: { readonly entry: Entry }) {
+  const label = LABELS[entry.agent] ?? entry.agent;
+  if (entry.status !== "done" || !entry.report) {
+    return (
+      <div className="metric-tile">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium">{label}</p>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {entry.status === "error" ? "evaluation failed" : "Jev evaluating…"}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  const report = entry.report;
+  const v = verdict(report);
+  const backed = report.numbers.checkedCount - report.numbers.misses.length;
 
   return (
     <div className="metric-tile">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">{LABELS[agent] ?? agent}</p>
-        <span
-          className={cn(
-            "rounded-sm px-1.5 py-0.5 font-mono text-[11px]",
-            report.pass ? "bg-accent-turquoise/10 text-accent-turquoise" : "bg-accent-rose/10 text-accent-rose",
-          )}
-        >
-          {report.pass ? "PASS" : "REVIEW"}
-        </span>
+        <p className="text-sm font-medium">{label}</p>
+        <span className={cn("rounded-sm px-1.5 py-0.5 font-mono text-[11px] uppercase", VERDICT_STYLE[v])}>{v}</span>
       </div>
       <div className="mt-3 flex items-end justify-between gap-3">
         <span className="font-mono text-2xl font-semibold">
-          {report.numbers.checkedCount - report.numbers.misses.length}/{report.numbers.checkedCount}
+          {backed}/{report.numbers.checkedCount}
         </span>
         <span className="text-xs text-muted-foreground">figures backed by tools</span>
       </div>
-      {unsupported + scopeFlags.length + report.policy.length > 0 ? (
+      {report.jev ? (
+        <div className="mt-3 grid gap-1.5">
+          {POLICY_CHECKS.map((check) => {
+            const p = report.policyMax[check];
+            const over = p >= POLICY_THRESHOLDS[check];
+            return (
+              <div className="grid grid-cols-[1fr_72px_34px] items-center gap-2 text-[11px]" key={check}>
+                <span className="truncate text-muted-foreground">{CHECK_LABELS[check]}</span>
+                <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <span
+                    className={cn("block h-full rounded-full", over ? "bg-accent-rose" : "bg-accent-turquoise")}
+                    style={{ width: `${Math.round(p * 100)}%` }}
+                  />
+                </span>
+                <span className="text-right font-mono">{p.toFixed(2)}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-2 text-[11px] text-muted-foreground">Figures only: TYPESAFE_API_KEY not set.</p>
+      )}
+      {report.numbers.misses.length + report.numbers.unknownIds.length + report.scope.filter((s) => s.flag).length > 0 ? (
         <ul className="mt-3 grid gap-1 text-xs">
           {report.numbers.misses.slice(0, 4).map((m, i) => (
             <li className="text-accent-rose" key={`n${i}`}>
@@ -167,19 +231,15 @@ function JevAgentTile({ agent, report }: { readonly agent: string; readonly repo
               Unknown member <span className="font-mono">{id}</span>
             </li>
           ))}
-          {scopeFlags.map((s, i) => (
-            <li className="text-accent-gold" key={`s${i}`}>
-              Scope {s.flag}: <span className="font-mono">{s.figure}</span>
-            </li>
-          ))}
-          {report.policy.map((p, i) => (
-            <li className="text-accent-gold" key={`p${i}`}>
-              {CHECK_LABELS[p.check] ?? p.check} <span className="font-mono">p={p.p.toFixed(2)}</span>
-            </li>
-          ))}
+          {report.scope
+            .filter((s) => s.flag)
+            .map((s, i) => (
+              <li className="text-accent-gold" key={`s${i}`}>
+                Scope {s.flag}: <span className="font-mono">{s.figure}</span>
+              </li>
+            ))}
         </ul>
       ) : null}
-      {!report.jev ? <p className="mt-2 text-[11px] text-muted-foreground">Figures only: TYPESAFE_API_KEY not set.</p> : null}
     </div>
   );
 }

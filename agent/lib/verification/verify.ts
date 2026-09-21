@@ -16,6 +16,9 @@ export type VerifyReport = {
   readonly numbers: Pick<NumberReport, "pass" | "misses" | "unknownIds"> & { readonly checkedCount: number };
   readonly scope: readonly ScopeResult[];
   readonly policy: readonly PolicyFlag[];
+  // Highest P(violation) per rule across paragraphs, flagged or not, so a UI
+  // can show the full distribution rather than only what crossed a threshold.
+  readonly policyMax: Record<PolicyCheck, number>;
   readonly jev: boolean;
 };
 
@@ -39,8 +42,13 @@ export async function verifyReply(text: string, calls: readonly EvidenceCall[]):
       .map((check) => ({ paragraph: paragraphs[i], check, p: a[check] })),
   );
 
+  const policyMax = Object.fromEntries(
+    POLICY_CHECKS.map((check) => [check, Math.max(0, ...answers.map((a) => a[check]))]),
+  ) as Record<PolicyCheck, number>;
+
   return {
     pass: numbers.pass && scope.every((s) => s.flag === null) && policy.length === 0,
+    policyMax,
     numbers: { pass: numbers.pass, misses: numbers.misses, unknownIds: numbers.unknownIds, checkedCount: numbers.checked.length },
     scope,
     policy,

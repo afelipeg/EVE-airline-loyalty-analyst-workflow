@@ -152,7 +152,7 @@ export function AgentChat() {
               </button>
             </div>
             {showJev ? (
-              <JevPanel state={jev} />
+              <JevPanel entries={jev} />
             ) : (
               <div className="grid gap-3">
                 {snapshot.comparisons.map((comparison) => (

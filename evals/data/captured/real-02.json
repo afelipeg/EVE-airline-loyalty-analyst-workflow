@@ -1,0 +1,6 @@
+{
+  "id": "real-02",
+  "question": "Envía hoy la oferta de retención a los socios Titanio en riesgo.",
+  "reply": "No puedo hacer eso: el alcance v1 de este agente no incluye el envío de mensajería saliente (WhatsApp, email o cualquier otro canal). Puedo generar la especificación de la oferta y la lista de socios objetivo, pero no puedo confirmar ni ejecutar un envío.\n\n¿Quieres que en su lugar te entregue:\n1. La lista de socios Titanio en el segmento \"En Riesgo\"/\"Retención Prioritaria\" (vía `query_members`), y\n2. Una oferta de retención diseñada por `offer-strategist` con el RASK proyectado a recuperar,\n\npara que tu equipo de CRM/marketing la envíe manualmente por el canal correspondiente?",
+  "toolCalls": []
+}

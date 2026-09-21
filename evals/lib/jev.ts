@@ -14,14 +14,21 @@ export async function askNouls<K extends string>(
   state: unknown,
   questions: Record<K, NoulQuestion>,
 ): Promise<Record<K, number>> {
-  const response = await fetch("https://api.typesafe.ai/v1/systemone", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.TYPESAFE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ state, model: "jev-latest", questions }),
-  });
+  // Retry 429/5xx with backoff: a sweep of ~200 requests hit a transient 503.
+  let response: Response;
+  for (let attempt = 1; ; attempt++) {
+    response = await fetch("https://api.typesafe.ai/v1/systemone", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.TYPESAFE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ state, model: "jev-latest", questions }),
+    });
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === 3) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+  }
   if (!response.ok) throw new Error(`TypeSafe ${response.status}: ${await response.text()}`);
 
   const body = (await response.json()) as { answers: Record<string, { noul: number }> };

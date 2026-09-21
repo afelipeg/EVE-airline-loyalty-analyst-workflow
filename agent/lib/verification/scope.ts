@@ -25,6 +25,8 @@ export type ScopeResult = {
 };
 
 type Row = Record<string, unknown>;
+// Accent-insensitive, case-sensitive: segment names are capitalized in prose.
+const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const ENTITY_KEYS = ["segment", "route", "memberId", "tier"] as const;
 
 function at(root: unknown, path: string): unknown {
@@ -48,6 +50,8 @@ const entityKind = (row: unknown): string =>
 export async function checkScope(figure: FigureResult, calls: readonly EvidenceCall[]): Promise<ScopeResult> {
   const match = figure.match!;
   const call = calls[match.call];
+  // A figure found in prose has no row or rollup to compare against.
+  if (match.path.endsWith("#text")) return { figure: figure.figure, claim: figure.sentence, flag: null };
   const output = call.output as { rollup?: { matchedMembers?: number; totalMembers?: number; scope?: string } } | null;
   const base: ScopeResult = { figure: figure.figure, claim: figure.sentence, flag: null };
 
@@ -109,7 +113,13 @@ export async function checkScope(figure: FigureResult, calls: readonly EvidenceC
   if (picks.entity && actualEntity) {
     const p = picks.entity.probabilities[picks.entity.choice];
     result.entity = { actual: actualEntity, picked: picks.entity.choice, p };
-    if (p >= SCOPE_THRESHOLD && picks.entity.choice !== actualEntity && picks.entity.choice !== "unclear") flag = "differs";
+    // Only when the claim literally names the other entity and not the real
+    // one: Jev reads prose like "RASK-at-risk" as the "En Riesgo" segment.
+    const names = (e: string) => fold(figure.sentence).includes(fold(e));
+    const picked = picks.entity.choice;
+    if (p >= SCOPE_THRESHOLD && picked !== actualEntity && picked !== "unclear" && names(picked) && !names(actualEntity)) {
+      flag = "differs";
+    }
   }
   result.flag = flag;
   return result;

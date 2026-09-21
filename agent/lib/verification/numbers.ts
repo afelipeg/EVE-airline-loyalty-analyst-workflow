@@ -36,8 +36,10 @@ export function collectKnown(calls: readonly EvidenceCall[]): { numbers: KnownNu
     if (typeof value === "number") numbers.push({ value, call, path });
     else if (typeof value === "string") {
       for (const id of value.match(MEMBER_ID) ?? []) ids.add(id);
+      // Dates and markup (chart SVG) are not statements of figures.
+      if (/^\d{4}-\d{2}-\d{2}/.test(value) || value.trimStart().startsWith("<")) return;
       for (const n of value.replace(/,(?=\d{3})/g, "").match(/\d+(?:\.\d+)?/g) ?? []) {
-        numbers.push({ value: Number(n), call, path });
+        numbers.push({ value: Number(n), call, path: `${path}#text` });
       }
     } else if (Array.isArray(value)) value.forEach((v, i) => walk(v, call, `${path}[${i}]`));
     else if (value && typeof value === "object") {
@@ -80,16 +82,22 @@ export function checkNumbers(text: string, calls: readonly EvidenceCall[]): Numb
 
   const checked = extractFigures(text).map((f): FigureResult => {
     const tol = tolerance(f.decimals);
-    // A percentage only matches a ratio field; against ~40 KB of output any
-    // bare "71" would otherwise be found somewhere.
-    const pool = f.isPercent ? numbers.filter((k) => RATIO_FIELD.test(k.path)) : numbers;
+    // A percentage only matches a ratio field or prose; against ~40 KB of
+    // output any bare "71" would otherwise be found somewhere.
+    // Ratio fields first; prose evidence (handoffs, skills, the incoming brief)
+    // states percentages as text, so it is the fallback.
+    const ratio = numbers.filter((k) => RATIO_FIELD.test(k.path));
+    const prose = numbers.filter((k) => k.path.endsWith("#text"));
+    const find = (pool: KnownNumber[]) =>
+      pool.find((k) => Math.abs(k.value - f.value) <= tol) ?? pool.find((k) => Math.abs(k.value * 100 - f.value) <= tol);
     const scale = f.figure.endsWith("M") ? 1e6 : 1;
     // Same number (in millions when written "1.12M"), or a fraction shown as a
     // percentage (0.8788 -> 87.9).
-    const match =
-      pool.find((k) => Math.abs(k.value - f.value) <= tol) ??
-      pool.find((k) => scale > 1 && Math.abs(k.value - f.value * scale) <= tol * scale) ??
-      pool.find((k) => Math.abs(k.value * 100 - f.value) <= tol);
+    const match = f.isPercent
+      ? (find(ratio) ?? find(prose))
+      : (numbers.find((k) => Math.abs(k.value - f.value) <= tol) ??
+        numbers.find((k) => scale > 1 && Math.abs(k.value - f.value * scale) <= tol * scale) ??
+        numbers.find((k) => Math.abs(k.value * 100 - f.value) <= tol));
     return match ? { ...f, match } : f;
   });
   const unknownIds = [...new Set(text.match(MEMBER_ID) ?? [])].filter((id) => !ids.has(id));

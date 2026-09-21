@@ -7,4 +7,7 @@ import type { EvidenceCall } from "./numbers.js";
 export const turnEvidence = defineState("verify-reply.turn", () => ({
   inputs: {} as Record<string, unknown>,
   calls: [] as EvidenceCall[],
+  // The incoming message: for a subagent, the Lead's brief with the figures it
+  // hands down, which the subagent may quote.
+  received: "",
 }));

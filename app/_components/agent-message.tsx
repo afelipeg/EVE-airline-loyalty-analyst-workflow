@@ -6,33 +6,40 @@ import type {
   EveMessage,
   EveMessagePart,
 } from "eve/react";
+import { cjk } from "@streamdown/cjk";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
 import {
+  BrainIcon,
   CheckCircleIcon,
   ExternalLinkIcon,
   FileCodeIcon,
   KeyRoundIcon,
+  SparklesIcon,
   TerminalSquareIcon,
+  WrenchIcon,
   XCircleIcon,
 } from "lucide-react";
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
+import { Streamdown } from "streamdown";
+import { CodeBlock } from "@/components/reui/code-block/code-block";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
+import { Message, MessageAvatar, MessageContent } from "@/components/ui/message";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/components/ui/trace";
 import { cn } from "@/lib/utils";
+import { ActivationConsole } from "./activation-console";
+
+const streamdownPlugins = { cjk, code, math, mermaid };
 
 export type AgentInputResponse = {
   readonly optionId?: string;
@@ -57,28 +64,38 @@ export function AgentMessage({
     (last, part, index) => (part.type === "text" ? index : last),
     -1,
   );
+  const isUser = message.role === "user";
 
   return (
     <Message
+      align={isUser ? "end" : "start"}
       data-optimistic={message.metadata?.optimistic ? "true" : undefined}
-      from={message.role}
     >
-      <MessageContent>
-        {message.parts.map((part, index) => (
-          <AgentMessagePart
-            canRespond={canRespond}
-            isLatestPart={index === message.parts.length - 1}
-            isMessageStreaming={isStreaming}
-            key={partKey(part, index)}
-            onInputResponses={onInputResponses}
-            part={part}
-            showCaret={
-              isStreaming &&
-              message.role === "assistant" &&
-              index === lastTextIndex
-            }
-          />
-        ))}
+      {isUser ? null : (
+        <MessageAvatar className="size-8 translate-y-0! self-start bg-primary/10 text-primary">
+          <SparklesIcon className="size-3.5" aria-hidden="true" />
+        </MessageAvatar>
+      )}
+      <MessageContent className="min-w-0">
+        <Bubble variant={isUser ? "muted" : "ghost"} className={isUser ? undefined : "w-full min-w-0"}>
+          <BubbleContent className="min-w-0 space-y-3">
+            {message.parts.map((part, index) => (
+              <AgentMessagePart
+                canRespond={canRespond}
+                isLatestPart={index === message.parts.length - 1}
+                isMessageStreaming={isStreaming}
+                key={partKey(part, index)}
+                onInputResponses={onInputResponses}
+                part={part}
+                showCaret={
+                  isStreaming &&
+                  message.role === "assistant" &&
+                  index === lastTextIndex
+                }
+              />
+            ))}
+          </BubbleContent>
+        </Bubble>
       </MessageContent>
     </Message>
   );
@@ -106,57 +123,119 @@ function AgentMessagePart({
       return null;
     case "text":
       return (
-        <MessageResponse caret="block" isAnimating={showCaret}>
-          {part.text}
-        </MessageResponse>
-      );
-    case "reasoning":
-      return (
-        <Reasoning
-          defaultOpen
-          isStreaming={
-            isMessageStreaming && isLatestPart && part.state === "streaming"
-          }
+        <Streamdown
+          caret="block"
+          className="size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+          isAnimating={showCaret}
+          plugins={streamdownPlugins}
         >
-          <ReasoningTrigger />
-          <ReasoningContent>{part.text}</ReasoningContent>
-        </Reasoning>
+          {part.text}
+        </Streamdown>
       );
+    case "reasoning": {
+      const thinking = isMessageStreaming && isLatestPart && part.state === "streaming";
+      return (
+        <Trace>
+          <TraceCollapsible defaultOpen>
+            <TraceCollapsibleTrigger>
+              <TraceLine status={thinking ? "running" : undefined}>
+                <TraceIcon>
+                  <BrainIcon />
+                </TraceIcon>
+                <TraceTitle>{thinking ? "Thinking" : "Reasoning"}</TraceTitle>
+              </TraceLine>
+            </TraceCollapsibleTrigger>
+            <TraceCollapsibleContent className="whitespace-pre-wrap text-xs">{part.text}</TraceCollapsibleContent>
+          </TraceCollapsible>
+        </Trace>
+      );
+    }
     case "authorization":
       return <AuthorizationPrompt part={part} />;
     case "dynamic-tool":
+      if (part.toolName === "record_activation_spec") {
+        return <ActivationConsole canRespond={canRespond} onInputResponses={onInputResponses} part={part} />;
+      }
       return (
         <div className="space-y-3">
           <SandboxChart output={part.output} toolName={part.toolName} />
-          <Tool
-            defaultOpen={
-              part.state === "approval-requested" ||
-              part.state === "approval-responded"
-            }
-          >
-            <ToolHeader
-              state={part.state}
-              title={part.toolName}
-              toolName={part.toolName}
-              type="dynamic-tool"
-            />
-            <ToolContent>
-              <ToolInput input={part.input} />
-              <InputRequestActions
-                canRespond={canRespond}
-                part={part}
-                onInputResponses={onInputResponses}
-              />
-              <SandboxArtifactSummary
-                output={part.output}
-                toolName={part.toolName}
-              />
-              <ToolOutput errorText={part.errorText} output={part.output} />
-            </ToolContent>
-          </Tool>
+          {/* Outside the collapsible: an approval must stay visible even if
+              the row mounted before the request arrived. */}
+          <InputRequestActions
+            canRespond={canRespond}
+            part={part}
+            onInputResponses={onInputResponses}
+          />
+          <Trace>
+            <TraceCollapsible
+              defaultOpen={
+                part.state === "approval-requested" ||
+                part.state === "approval-responded"
+              }
+            >
+              <TraceCollapsibleTrigger>
+                <TraceLine status={toolLineStatus(part.state)}>
+                  <TraceIcon>
+                    <WrenchIcon />
+                  </TraceIcon>
+                  <TraceTitle>{part.toolName}</TraceTitle>
+                  <TraceDescription>{TOOL_STATE_LABELS[part.state]}</TraceDescription>
+                </TraceLine>
+              </TraceCollapsibleTrigger>
+              <TraceCollapsibleContent className="space-y-3">
+                <ToolJson label="Input" value={part.input} />
+                <SandboxArtifactSummary
+                  output={part.output}
+                  toolName={part.toolName}
+                />
+                {part.errorText ? (
+                  <p className="text-destructive text-xs">{part.errorText}</p>
+                ) : (
+                  <ToolJson label="Output" value={withoutChartSvg(part.output)} />
+                )}
+              </TraceCollapsibleContent>
+            </TraceCollapsible>
+          </Trace>
         </div>
       );
   }
+}
+
+const TOOL_STATE_LABELS: Record<EveDynamicToolPart["state"], string> = {
+  "approval-requested": "Awaiting approval",
+  "approval-responded": "Responded",
+  "input-available": "Running",
+  "input-streaming": "Pending",
+  "output-available": "Completed",
+  "output-denied": "Denied",
+  "output-error": "Error",
+};
+
+function toolLineStatus(state: EveDynamicToolPart["state"]) {
+  if (state === "output-error" || state === "output-denied") return "error";
+  if (state === "input-available" || state === "input-streaming") return "running";
+  return undefined;
+}
+
+// The chart renders as an image above the trace; its SVG markup would only
+// flood the JSON block.
+function withoutChartSvg(output: unknown): unknown {
+  const record = asRecord(output);
+  if (!record || !("chartSvg" in record)) return output;
+  const { chartSvg: _chartSvg, ...rest } = record;
+  return rest;
+}
+
+function ToolJson({ label, value }: { readonly label: string; readonly value: unknown }) {
+  if (value === undefined || value === null) return null;
+  return (
+    <CodeBlock
+      code={typeof value === "string" ? value : JSON.stringify(value, null, 2)}
+      label={label}
+      language="json"
+      wrap
+    />
+  );
 }
 
 function AuthorizationPrompt({
@@ -217,11 +296,13 @@ function AuthorizationPrompt({
             </div>
           ) : null}
           {part.state === "required" && part.authorization?.url ? (
-            <Button asChild size="sm">
-              <a href={part.authorization.url} rel="noreferrer" target="_blank">
-                <ExternalLinkIcon className="size-4" />
-                Sign in with {part.displayName}
-              </a>
+            <Button
+              nativeButton={false}
+              render={<a href={part.authorization.url} rel="noreferrer" target="_blank" />}
+              size="sm"
+            >
+              <ExternalLinkIcon className="size-4" />
+              Sign in with {part.displayName}
             </Button>
           ) : null}
         </div>

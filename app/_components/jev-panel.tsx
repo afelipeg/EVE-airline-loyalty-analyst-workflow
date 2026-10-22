@@ -3,6 +3,22 @@
 import { Client } from "eve/client";
 import { useEffect, useRef, useState } from "react";
 
+import { ShieldCheckIcon } from "lucide-react";
+
+import { Badge } from "@/components/reui/badge";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/components/ui/trace";
 import { cn } from "@/lib/utils";
 import type { EvidenceCall } from "@/agent/lib/verification/numbers";
 import { POLICY_CHECKS, POLICY_THRESHOLDS, type PolicyCheck } from "@/agent/lib/verification/policy";
@@ -120,6 +136,7 @@ export function useJevReports(events: readonly StreamEvent[], idle: boolean) {
 }
 
 export function JevPanel({ entries }: { readonly entries: readonly Entry[] }) {
+  const [issuesOnly, setIssuesOnly] = useState(false);
   if (entries.length === 0) {
     return (
       <p className="text-sm leading-6 text-muted-foreground">
@@ -130,18 +147,25 @@ export function JevPanel({ entries }: { readonly entries: readonly Entry[] }) {
   }
   const counts = { pass: 0, review: 0, flag: 0 };
   for (const e of entries) if (e.report) counts[verdict(e.report)]++;
+  const shown = issuesOnly ? entries.filter((e) => !e.report || verdict(e.report) !== "pass") : entries;
 
   return (
-    <div className="grid gap-3">
-      <div className="grid grid-cols-3 gap-2 text-center font-mono text-[11px]">
-        <span className="rounded-sm bg-accent-turquoise/10 py-1 text-accent-turquoise">{counts.pass} pass</span>
-        <span className="rounded-sm bg-accent-gold/10 py-1 text-accent-gold">{counts.review} review</span>
-        <span className="rounded-sm bg-accent-rose/10 py-1 text-accent-rose">{counts.flag} flag</span>
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge size="sm" variant="success-light">{counts.pass} pass</Badge>
+        <Badge size="sm" variant="warning-light">{counts.review} review</Badge>
+        <Badge size="sm" variant="destructive-light">{counts.flag} flag</Badge>
+        <Label className="ms-auto gap-2 text-xs font-normal text-muted-foreground">
+          <Switch checked={issuesOnly} onCheckedChange={setIssuesOnly} size="sm" />
+          Issues only
+        </Label>
       </div>
-      {entries.map((entry, i) => (
-        <JevAgentTile entry={entry} key={`${entry.agent}-${i}`} />
-      ))}
-      <p className="text-[11px] leading-4 text-muted-foreground">
+      <Trace className="text-sm">
+        {shown.map((entry, i) => (
+          <JevAgentRow entry={entry} key={`${entry.agent}-${i}`} />
+        ))}
+      </Trace>
+      <p className="text-xs leading-5 text-muted-foreground">
         Agents reason, Jev evaluates (observe-only). Figures are checked against each agent&apos;s own tool output;
         scope and policies are Jev probabilities.
       </p>
@@ -161,85 +185,88 @@ function verdict(report: VerifyReport): Verdict {
   return near || report.scope.some((s) => s.flag === "unclear") ? "review" : "pass";
 }
 
-const VERDICT_STYLE: Record<Verdict, string> = {
-  pass: "bg-accent-turquoise/10 text-accent-turquoise",
-  review: "bg-accent-gold/10 text-accent-gold",
-  flag: "bg-accent-rose/10 text-accent-rose",
-};
+const VERDICT_BADGE = {
+  pass: "success-light",
+  review: "warning-light",
+  flag: "destructive-light",
+} as const satisfies Record<Verdict, string>;
 
-function JevAgentTile({ entry }: { readonly entry: Entry }) {
+// One trace row per agent: verdict and backed figures on the line, the policy
+// probabilities and any unsupported figure or scope issue inside.
+function JevAgentRow({ entry }: { readonly entry: Entry }) {
   const label = LABELS[entry.agent] ?? entry.agent;
   if (entry.status !== "done" || !entry.report) {
     return (
-      <div className="metric-tile">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-medium">{label}</p>
-          <span className="font-mono text-[11px] text-muted-foreground">
-            {entry.status === "error" ? "evaluation failed" : "Jev evaluating…"}
-          </span>
-        </div>
-      </div>
+      <TraceLine status={entry.status === "error" ? "error" : "running"}>
+        <TraceIcon>
+          <ShieldCheckIcon />
+        </TraceIcon>
+        <TraceTitle>{label}</TraceTitle>
+        <TraceDescription>{entry.status === "error" ? "evaluation failed" : "Jev evaluating…"}</TraceDescription>
+      </TraceLine>
     );
   }
   const report = entry.report;
   const v = verdict(report);
   const backed = report.numbers.checkedCount - report.numbers.misses.length;
+  const issues = report.numbers.misses.length + report.numbers.unknownIds.length + report.scope.filter((s) => s.flag).length;
 
   return (
-    <div className="metric-tile">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">{label}</p>
-        <span className={cn("rounded-sm px-1.5 py-0.5 font-mono text-[11px] uppercase", VERDICT_STYLE[v])}>{v}</span>
-      </div>
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <span className="font-mono text-2xl font-semibold">
-          {backed}/{report.numbers.checkedCount}
-        </span>
-        <span className="text-xs text-muted-foreground">figures backed by tools</span>
-      </div>
-      {report.jev ? (
-        <div className="mt-3 grid gap-1.5">
-          {POLICY_CHECKS.map((check) => {
-            const p = report.policyMax[check];
-            const over = p >= POLICY_THRESHOLDS[check];
-            return (
-              <div className="grid grid-cols-[1fr_72px_34px] items-center gap-2 text-[11px]" key={check}>
-                <span className="truncate text-muted-foreground">{CHECK_LABELS[check]}</span>
-                <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <span
-                    className={cn("block h-full rounded-full", over ? "bg-accent-rose" : "bg-accent-turquoise")}
-                    style={{ width: `${Math.round(p * 100)}%` }}
-                  />
-                </span>
-                <span className="text-right font-mono">{p.toFixed(2)}</span>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="mt-2 text-[11px] text-muted-foreground">Figures only: TYPESAFE_API_KEY not set.</p>
-      )}
-      {report.numbers.misses.length + report.numbers.unknownIds.length + report.scope.filter((s) => s.flag).length > 0 ? (
-        <ul className="mt-3 grid gap-1 text-xs">
-          {report.numbers.misses.slice(0, 4).map((m, i) => (
-            <li className="text-accent-rose" key={`n${i}`}>
-              Unsupported figure <span className="font-mono">{m.figure}</span>
-            </li>
-          ))}
-          {report.numbers.unknownIds.map((id) => (
-            <li className="text-accent-rose" key={id}>
-              Unknown member <span className="font-mono">{id}</span>
-            </li>
-          ))}
-          {report.scope
-            .filter((s) => s.flag)
-            .map((s, i) => (
-              <li className="text-accent-gold" key={`s${i}`}>
-                Scope {s.flag}: <span className="font-mono">{s.figure}</span>
+    <TraceCollapsible defaultOpen={v !== "pass"}>
+      <TraceCollapsibleTrigger>
+        <TraceLine status={v === "flag" ? "error" : undefined}>
+          <TraceIcon>
+            <ShieldCheckIcon />
+          </TraceIcon>
+          <TraceTitle className="text-foreground">{label}</TraceTitle>
+          <Badge size="xs" variant={VERDICT_BADGE[v]} className="uppercase">
+            {v}
+          </Badge>
+          <TraceDescription>
+            {backed}/{report.numbers.checkedCount} figures backed
+          </TraceDescription>
+        </TraceLine>
+      </TraceCollapsibleTrigger>
+      <TraceCollapsibleContent>
+        {report.jev ? (
+          <div className="grid gap-1.5">
+            {POLICY_CHECKS.map((check) => {
+              const p = report.policyMax[check];
+              const over = p >= POLICY_THRESHOLDS[check];
+              return (
+                <div className="grid grid-cols-[1fr_72px_34px] items-center gap-2 text-xs" key={check}>
+                  <span className="truncate">{CHECK_LABELS[check]}</span>
+                  <Progress value={Math.round(p * 100)} className={cn(over && "[&_[data-slot=progress-indicator]]:bg-destructive")} />
+                  <span className="text-right font-mono">{p.toFixed(2)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs">Figures only: TYPESAFE_API_KEY not set.</p>
+        )}
+        {issues > 0 ? (
+          <ul className="mt-3 grid gap-1 text-xs">
+            {report.numbers.misses.slice(0, 4).map((m, i) => (
+              <li className="text-destructive" key={`n${i}`}>
+                Unsupported figure <span className="font-mono">{m.figure}</span>
               </li>
             ))}
-        </ul>
-      ) : null}
-    </div>
+            {report.numbers.unknownIds.map((id) => (
+              <li className="text-destructive" key={id}>
+                Unknown member <span className="font-mono">{id}</span>
+              </li>
+            ))}
+            {report.scope
+              .filter((s) => s.flag)
+              .map((s, i) => (
+                <li className="text-warning-foreground" key={`s${i}`}>
+                  Scope {s.flag}: <span className="font-mono">{s.figure}</span>
+                </li>
+              ))}
+          </ul>
+        ) : null}
+      </TraceCollapsibleContent>
+    </TraceCollapsible>
   );
 }

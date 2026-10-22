@@ -26,7 +26,10 @@ into RASK.
 
 # Operating rules
 
-- Use `query_network` before making any conclusion.
+- Use `query_network` before making any conclusion about routes and network.
+- Use `attribute_rask` for which channel or campaign moved revenue and RASK. Default to position_based;
+  quote last_touch alongside when the ranking changes. Attributed is not incremental: report the holdout
+  comparison and its caveat with it.
 - Treat the network dataset returned by the tool as the only source of
   truth.
 - Do not fabricate causes for RASK or load factor movement. Separate

@@ -13,6 +13,9 @@ recommendations for a member segment, not just analysis.
 - Use `design_offers` before making any conclusion. Do not invent offers or
   numbers outside what the tool returns.
 - Rank offers by RASK-recovered-per-peso (ROI), highest first.
+- When asked to personalize, call `plan_personalization` after `design_offers`, passing each targeted
+  member with the offer name you assigned. Report ready, holdout, no-consent and frequency-capped counts;
+  do not move holdout members into the plan.
 - Ground every number in the tool output. Separate measured facts (target
   counts, estimated RASK recovered) from assumptions (the recovery factors
   and incentive costs are modeled assumptions documented in the playbook,

@@ -1,47 +1,76 @@
 "use client";
 
 import { useEveAgent } from "eve/react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { type FormEvent, type KeyboardEvent, useState } from "react";
 import {
-  ActivityIcon,
   AlertCircleIcon,
-  AwardIcon,
+  ArrowUpIcon,
   BotIcon,
   CalendarClockIcon,
-  CheckCircle2Icon,
-  DatabaseIcon,
+  FingerprintIcon,
   Layers3Icon,
+  LogOutIcon,
   MessageSquareIcon,
-  NetworkIcon,
+  PanelRightIcon,
   PlaneIcon,
   PlayIcon,
-  ShieldCheckIcon,
+  NetworkIcon,
+  RouteIcon,
   SparklesIcon,
-  TagIcon,
+  TargetIcon,
+  UsersRoundIcon,
   TerminalSquareIcon,
-  UsersIcon,
-  WrenchIcon,
   WorkflowIcon,
 } from "lucide-react";
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import {
-  PromptInput,
-  type PromptInputMessage,
-  PromptInputSubmit,
-  PromptInputTextarea,
-} from "@/components/ai-elements/prompt-input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
+import { Badge } from "@/components/reui/badge";
+import { Frame, FramePanel } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { getDashboardSnapshot } from "@/agent/lib/aeromexico-data";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { AgentMessage } from "./agent-message";
+import type { AttributionModel } from "@/agent/lib/cdp/attribution";
+import { AttributionView, type AttributionData } from "./attribution-view";
+import { IdentityView, type IdentitySummary } from "./identity-view";
 import { JevPanel, useJevReports } from "./jev-panel";
+import { MetricsPanel, snapshot } from "./metrics-panel";
+import { PersonalizationView, type PersonalizationData } from "./personalization-view";
+import { RaskDriversView, type RaskDrivers } from "./rask-drivers-view";
+import { TeamRunView } from "./team-run-view";
+import { RunTimeline, type StreamEvent } from "./run-timeline";
 
 const AGENT_NAME = "Loyalty Analyst";
-const snapshot = getDashboardSnapshot();
+const MODEL_LABEL = "claude-sonnet-5 · AI Gateway";
 
 const suggestions = [
   "Which Oro & Platino members on MEX–JFK are at churn risk, and which offer recovers the most RASK per peso?",
@@ -59,37 +88,55 @@ const stackMoments = [
 ];
 
 type AgentStatus = ReturnType<typeof useEveAgent>["status"];
-type StreamEvent = {
-  readonly type: string;
-  readonly data?: unknown;
-};
-type TimelineTone = "teal" | "gold" | "cyan" | "purple" | "red" | "muted";
-type TimelineItem = {
-  readonly key: string;
-  readonly title: string;
-  readonly detail: string;
-  readonly eyebrow: string;
-  readonly meta?: string;
-  readonly tone: TimelineTone;
-  readonly icon: typeof ActivityIcon;
-};
+type InspectorTab = "jev" | "run" | "metrics";
+type View = "chat" | "identity" | "attribution" | "personalization" | "team" | "drivers";
 
-export function AgentChat() {
+const views = [
+  { id: "chat", label: "Chat", icon: MessageSquareIcon },
+  { id: "identity", label: "Identity", icon: FingerprintIcon },
+  { id: "attribution", label: "Attribution", icon: RouteIcon },
+  { id: "personalization", label: "Personalization", icon: TargetIcon },
+  { id: "team", label: "Team run", icon: UsersRoundIcon },
+  { id: "drivers", label: "RASK drivers", icon: NetworkIcon },
+] as const;
+
+export function AgentChat({
+  attribution,
+  drivers,
+  identity,
+  personalization,
+  userEmail,
+}: {
+  readonly attribution: AttributionData;
+  readonly drivers: Readonly<Record<AttributionModel, RaskDrivers>>;
+  readonly identity: IdentitySummary;
+  readonly personalization: PersonalizationData;
+  readonly userEmail: string;
+}) {
   const agent = useEveAgent();
+  const isMobile = useIsMobile();
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
   const isEmpty = agent.data.messages.length === 0;
-  const jev = useJevReports(agent.events as readonly StreamEvent[], agent.status === "ready");
-  const [panel, setPanel] = useState<"jev" | "metrics">("jev");
-  const showJev = panel === "jev";
+  const events = agent.events as readonly StreamEvent[];
+  const jev = useJevReports(events, agent.status === "ready");
+  // Docked beside the chat on desktop (open by default); a sheet on phones
+  // (closed by default, so the chat stays visible).
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorSheetOpen, setInspectorSheetOpen] = useState(false);
+  const showInspector = isMobile ? inspectorSheetOpen : inspectorOpen;
+  const toggleInspector = () => (isMobile ? setInspectorSheetOpen : setInspectorOpen)((open) => !open);
+  const [tab, setTab] = useState<InspectorTab>("jev");
+  // Only the left panel swaps; the chat session lives in this component.
+  const [view, setView] = useState<View>("chat");
 
-  const handleSubmit = async (message: PromptInputMessage) => {
-    const text = message.text.trim();
-    if (!text || isBusy) return;
-
-    await agent.send({ message: text });
+  const send = async (text: string) => {
+    const message = text.trim();
+    if (!message || isBusy) return;
+    await agent.send({ message });
   };
 
   const sendSuggestion = async (text: string) => {
+    setView("chat");
     if (isBusy) return;
     await agent.send({
       message: text,
@@ -101,798 +148,417 @@ export function AgentChat() {
     });
   };
 
-  const composer = (
-    <PromptInput onSubmit={handleSubmit}>
-      <PromptInputTextarea placeholder="Ask the Loyalty Analyst about RASK, load factor, churn risk, or offers..." />
-      <PromptInputSubmit
-        className="bg-accent-rose text-white hover:bg-accent-rose/90"
-        onStop={agent.stop}
-        status={agent.status}
-      />
-    </PromptInput>
+  const planSegment = (segment: string) => {
+    void sendSuggestion(`Personalize a retention activation for ${segment} members: offer, channel and day, ready for my approval.`);
+  };
+
+  const inspector = (
+    <Inspector
+      events={events}
+      isBusy={isBusy}
+      jev={jev}
+      onTabChange={setTab}
+      tab={tab}
+    />
   );
 
   return (
-    <main className="h-dvh overflow-hidden bg-background text-foreground">
-      <div className="mx-auto grid h-full w-full max-w-[1560px] gap-4 overflow-hidden px-4 py-4 lg:grid-cols-[360px_minmax(0,1fr)_360px]">
-        <aside className="app-scroll flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-          <section className="dashboard-panel shrink-0 p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="eyebrow">Vercel Agent Stack demo</p>
-                <h1 className="mt-3 text-4xl font-semibold leading-none tracking-normal">
-                  {AGENT_NAME}
-                </h1>
-              </div>
-              <StatusBadge status={agent.status} />
-            </div>
-            <p className="mt-5 text-sm leading-6 text-muted-foreground">
-              Explore customer behavior, loyalty segments and retention
-              opportunities in a synthetic airline loyalty dataset — sandboxed
-              analysis, specialist subagents, and durable runs on Vercel Eve.
-            </p>
-          </section>
-
-          <section className="dashboard-panel shrink-0 p-4">
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {showJev ? (
-                  <ShieldCheckIcon className="size-4 text-accent-turquoise" />
-                ) : (
-                  <DatabaseIcon className="size-4 text-accent-blue" />
-                )}
-                <h2 className="section-title">{showJev ? "Jev Evaluation" : "Metrics Snapshot"}</h2>
-              </div>
-              <button
-                className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
-                onClick={() => setPanel(panel === "jev" ? "metrics" : "jev")}
-                type="button"
-              >
-                {panel === "jev" ? "Metrics" : "Jev"}
-              </button>
-            </div>
-            {showJev ? (
-              <JevPanel entries={jev} />
-            ) : (
-              <div className="grid gap-3">
-                {snapshot.comparisons.map((comparison) => (
-                  <MetricTile key={comparison.metric} comparison={comparison} />
-                ))}
-              </div>
-            )}
-          </section>
-        </aside>
-
-        <section className="dashboard-panel flex h-full min-h-0 flex-col overflow-hidden">
-          <header className="shrink-0 border-b border-border px-5 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="eyebrow">Live Eve session</p>
-                <h2 className="mt-1 text-xl font-semibold tracking-normal">
-                  Ask the Loyalty Analyst anything about the two-week dataset
-                </h2>
-              </div>
-              <Button
-                className="rounded-md"
-                disabled={isBusy}
-                onClick={() => sendSuggestion(suggestions[2])}
-                type="button"
-              >
-                <CalendarClockIcon className="size-4" />
-                Weekly report
-              </Button>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {suggestions.map((suggestion) => (
-                <button
-                  className="suggestion-chip"
-                  disabled={isBusy}
-                  key={suggestion}
-                  onClick={() => sendSuggestion(suggestion)}
-                  type="button"
-                >
-                  <PlayIcon className="size-3.5" />
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </header>
-
-          {agent.error ? (
-            <div className="mx-5 mt-4 flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
-              <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
-              <div>
-                <p className="font-medium">Request failed</p>
-                <p className="mt-0.5 text-muted-foreground">
-                  {agent.error.message}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {isEmpty ? (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
-              <div className="max-w-2xl">
-                <div className="mx-auto flex size-14 items-center justify-center rounded-md border border-accent-blue/35 bg-accent-blue/10 text-accent-blue">
-                  <ActivityIcon className="size-7" />
-                </div>
-                <h3 className="mt-6 text-3xl font-semibold tracking-normal">
-                  Start with the hero prompt from the video.
-                </h3>
-                <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-                  The Loyalty Analyst will query deterministic loyalty
-                  data, run a sandboxed analysis step, delegate to specialist
-                  subagents when needed, and return a recording-ready summary
-                  with concrete dates.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <Conversation className="min-h-0 flex-1">
-              <ConversationContent className="mx-auto w-full max-w-4xl gap-6 px-5 py-6">
-                {agent.data.messages.map((message, index) => (
-                  <AgentMessage
-                    canRespond={!isBusy}
-                    isStreaming={
-                      agent.status === "streaming" &&
-                      index === agent.data.messages.length - 1
-                    }
-                    key={message.id}
-                    message={message}
-                    onInputResponses={(inputResponses) =>
-                      agent.send({ inputResponses })
-                    }
-                  />
-                ))}
-              </ConversationContent>
-              <ConversationScrollButton />
-            </Conversation>
-          )}
-
-          <div className="shrink-0 border-t border-border bg-card/70 px-5 py-4">
-            {composer}
+    <SidebarProvider className="h-svh overflow-hidden">
+      <AppSidebar
+        isBusy={isBusy}
+        onSuggestion={sendSuggestion}
+        onViewChange={setView}
+        status={agent.status}
+        userEmail={userEmail}
+        view={view}
+      />
+      <SidebarInset className="min-h-0 overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ms-1" />
+          <Separator orientation="vertical" className="me-1 data-vertical:h-4 data-vertical:self-center" />
+          <h1 className="min-w-0 truncate text-sm font-semibold">Live eve session</h1>
+          <Badge variant="outline" size="sm" className="hidden md:inline-flex">
+            {MODEL_LABEL}
+          </Badge>
+          <div className="ms-auto flex items-center gap-2">
+            <StatusBadge status={agent.status} />
+            <Button
+              aria-label={showInspector ? "Hide inspector" : "Show inspector"}
+              aria-pressed={showInspector}
+              onClick={toggleInspector}
+              size="icon-sm"
+              variant="ghost"
+            >
+              <PanelRightIcon />
+            </Button>
           </div>
-        </section>
+        </header>
 
-        <aside className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
-          <section className="dashboard-panel shrink-0 p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <ShieldCheckIcon className="size-4 text-accent-blue" />
-              <h2 className="section-title">Agent Stack</h2>
-            </div>
-            <div className="grid gap-2">
-              {stackMoments.map((moment) => (
-                <StackMoment key={moment.label} {...moment} />
-              ))}
-            </div>
-          </section>
+        <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+          <ResizablePanel minSize="40">
+            {view === "identity" ? <IdentityView summary={identity} /> : null}
+            {view === "attribution" ? <AttributionView data={attribution} /> : null}
+            {view === "personalization" ? (
+              <PersonalizationView data={personalization} isBusy={isBusy} onPlanSegment={planSegment} />
+            ) : null}
+            {view === "team" ? <TeamRunView events={events} status={agent.status} /> : null}
+            {view === "drivers" ? <RaskDriversView drivers={drivers} /> : null}
+            <div className={view === "chat" ? "flex h-full min-h-0 flex-col" : "hidden"}>
+              {agent.error ? (
+                <Alert variant="destructive" className="mx-auto mt-4 w-[calc(100%-2rem)] max-w-3xl">
+                  <AlertCircleIcon />
+                  <AlertTitle>Request failed</AlertTitle>
+                  <AlertDescription>{agent.error.message}</AlertDescription>
+                </Alert>
+              ) : null}
 
-          <section className="dashboard-panel flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-            <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <WorkflowIcon className="size-4 text-accent-turquoise" />
-                <h2 className="section-title">Run Timeline</h2>
-              </div>
-              <span className="font-mono text-[11px] text-muted-foreground">
-                {agent.events.length} events
+              {isEmpty ? (
+                <ThreadStart isBusy={isBusy} onSuggestion={sendSuggestion} />
+              ) : (
+                <MessageScrollerProvider autoScroll>
+                  <MessageScroller className="min-h-0 flex-1">
+                    <MessageScrollerViewport>
+                      <MessageScrollerContent
+                        aria-busy={isBusy}
+                        className="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-6 px-4 py-6 sm:px-6"
+                      >
+                        {agent.data.messages.map((message, index) => (
+                          <MessageScrollerItem className="[content-visibility:visible]" key={message.id} messageId={message.id}>
+                            <AgentMessage
+                              canRespond={!isBusy}
+                              isStreaming={
+                                agent.status === "streaming" &&
+                                index === agent.data.messages.length - 1
+                              }
+                              message={message}
+                              onInputResponses={(inputResponses) =>
+                                agent.send({ inputResponses })
+                              }
+                            />
+                          </MessageScrollerItem>
+                        ))}
+                        {agent.status === "submitted" ? (
+                          <MessageScrollerItem className="[content-visibility:visible]">
+                            <Marker className="ps-10">
+                              <MarkerIcon>
+                                <Spinner />
+                              </MarkerIcon>
+                              <MarkerContent className="shimmer">{AGENT_NAME} is working</MarkerContent>
+                            </Marker>
+                          </MessageScrollerItem>
+                        ) : null}
+                      </MessageScrollerContent>
+                    </MessageScrollerViewport>
+                    <MessageScrollerButton
+                      className="bottom-4 rounded-full shadow-sm"
+                      size="icon-sm"
+                      variant="outline"
+                    />
+                  </MessageScroller>
+                </MessageScrollerProvider>
+              )}
+
+              <Composer isBusy={isBusy} onSend={send} onStop={agent.stop} />
+            </div>
+          </ResizablePanel>
+          {inspectorOpen && !isMobile ? (
+            <>
+              <ResizableHandle />
+              <ResizablePanel defaultSize="34" minSize="24" maxSize="50">
+                {inspector}
+              </ResizablePanel>
+            </>
+          ) : null}
+        </ResizablePanelGroup>
+      </SidebarInset>
+
+      {isMobile ? (
+        <Sheet open={inspectorSheetOpen} onOpenChange={setInspectorSheetOpen}>
+          <SheetContent className="w-full p-0 sm:max-w-md">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Inspector</SheetTitle>
+            </SheetHeader>
+            {inspector}
+          </SheetContent>
+        </Sheet>
+      ) : null}
+    </SidebarProvider>
+  );
+}
+
+function AppSidebar({
+  isBusy,
+  onSuggestion,
+  onViewChange,
+  status,
+  userEmail,
+  view,
+}: {
+  readonly isBusy: boolean;
+  readonly onSuggestion: (text: string) => void;
+  readonly onViewChange: (view: View) => void;
+  readonly status: AgentStatus;
+  readonly userEmail: string;
+  readonly view: View;
+}) {
+  const router = useRouter();
+
+  const signOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  };
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" className="pointer-events-none">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                <PlaneIcon className="size-4" />
               </span>
-            </div>
-            <Timeline
-              events={agent.events as readonly StreamEvent[]}
-              isEmpty={isEmpty}
-            />
-          </section>
-        </aside>
+              <span className="grid min-w-0 flex-1 text-start leading-tight">
+                <span className="truncate text-sm font-semibold">{AGENT_NAME}</span>
+                <span className="truncate text-xs text-muted-foreground">Club Premier · Vercel eve</span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Views</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {views.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton isActive={view === item.id} onClick={() => onViewChange(item.id)} tooltip={item.label}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Ask</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  disabled={isBusy}
+                  onClick={() => onSuggestion(suggestions[2])}
+                  tooltip="Weekly report"
+                >
+                  <CalendarClockIcon />
+                  <span>Weekly report</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {suggestions.slice(0, 2).map((suggestion) => (
+                <SidebarMenuItem key={suggestion}>
+                  <SidebarMenuButton
+                    className="h-auto items-start py-2"
+                    disabled={isBusy}
+                    onClick={() => onSuggestion(suggestion)}
+                    tooltip={suggestion}
+                  >
+                    <PlayIcon className="mt-0.5" />
+                    <span className="line-clamp-3 whitespace-normal">{suggestion}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Agent stack</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {stackMoments.map((moment) => (
+                <SidebarMenuItem key={moment.label}>
+                  <SidebarMenuButton className="pointer-events-none" tooltip={moment.label}>
+                    <moment.icon />
+                    <span className="truncate">{moment.label}</span>
+                    <span className="ms-auto truncate text-xs text-muted-foreground">{moment.value}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={signOut} tooltip="Sign out">
+              <LogOutIcon />
+              <span className="grid min-w-0 flex-1 text-start leading-tight">
+                <span className="truncate text-xs">{userEmail}</span>
+                <span className="truncate text-xs text-muted-foreground">Sign out · {status}</span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+function ThreadStart({
+  isBusy,
+  onSuggestion,
+}: {
+  readonly isBusy: boolean;
+  readonly onSuggestion: (text: string) => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-6 px-4 py-10 sm:px-6">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Ask the Loyalty Analyst about the two-week dataset</h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            It queries deterministic loyalty data, runs a sandboxed analysis step, delegates to specialist subagents
+            when needed, and returns a summary framed on RASK and load factor against the fixed ASK.
+          </p>
+        </div>
+        <Frame stacked>
+          {suggestions.map((suggestion) => (
+            <FramePanel className="p-0" key={suggestion}>
+              <button
+                className="flex w-full items-start gap-3 px-4 py-3 text-start text-sm transition-colors hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
+                disabled={isBusy}
+                onClick={() => onSuggestion(suggestion)}
+                type="button"
+              >
+                <PlayIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                {suggestion}
+              </button>
+            </FramePanel>
+          ))}
+        </Frame>
       </div>
-    </main>
+    </div>
+  );
+}
+
+function Composer({
+  isBusy,
+  onSend,
+  onStop,
+}: {
+  readonly isBusy: boolean;
+  readonly onSend: (text: string) => Promise<void>;
+  readonly onStop: () => void;
+}) {
+  const [text, setText] = useState("");
+
+  const submit = (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!text.trim() || isBusy) return;
+    void onSend(text);
+    setText("");
+  };
+
+  // Enter sends, Shift+Enter breaks the line.
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) submit(event);
+  };
+
+  return (
+    <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-2 px-4 pb-3 sm:px-6">
+      <form onSubmit={submit}>
+        <InputGroup>
+          <InputGroupTextarea
+            aria-label="Message the Loyalty Analyst"
+            className="max-h-48 min-h-16"
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Ask about RASK, load factor, churn risk, or offers..."
+            value={text}
+          />
+          <InputGroupAddon align="block-end">
+            <span className="text-xs text-muted-foreground">Enter to send · Shift+Enter for a new line</span>
+            {isBusy ? (
+              <InputGroupButton aria-label="Stop generating" className="ms-auto" onClick={onStop} size="icon-sm" variant="outline">
+                <span aria-hidden="true" className="size-2.5 rounded-xs bg-foreground" />
+              </InputGroupButton>
+            ) : (
+              <InputGroupButton aria-label="Send message" className="ms-auto" disabled={!text.trim()} size="icon-sm" type="submit" variant="default">
+                <ArrowUpIcon />
+              </InputGroupButton>
+            )}
+          </InputGroupAddon>
+        </InputGroup>
+      </form>
+      <p className="text-center text-xs text-muted-foreground">
+        Synthetic dataset. The analyst produces recommendations, never sends offers.
+      </p>
+    </div>
+  );
+}
+
+function Inspector({
+  events,
+  isBusy,
+  jev,
+  onTabChange,
+  tab,
+}: {
+  readonly events: readonly StreamEvent[];
+  readonly isBusy: boolean;
+  readonly jev: ReturnType<typeof useJevReports>;
+  readonly onTabChange: (tab: InspectorTab) => void;
+  readonly tab: InspectorTab;
+}) {
+  return (
+    <Tabs
+      className="flex h-full min-h-0 flex-col gap-0 bg-sidebar/40"
+      onValueChange={(value) => onTabChange(value as InspectorTab)}
+      value={tab}
+    >
+      <div className="flex h-12 shrink-0 items-center border-b px-3">
+        <TabsList variant="line">
+          <TabsTrigger value="jev">Jev</TabsTrigger>
+          <TabsTrigger value="run">
+            Run
+            <Badge size="xs" variant="outline" className="ms-1 tabular-nums">
+              {events.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="metrics">Metrics</TabsTrigger>
+        </TabsList>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <TabsContent value="jev">
+          <JevPanel entries={jev} />
+        </TabsContent>
+        <TabsContent value="run">
+          <RunTimeline events={events} isBusy={isBusy} />
+        </TabsContent>
+        <TabsContent value="metrics">
+          <MetricsPanel />
+        </TabsContent>
+      </div>
+    </Tabs>
   );
 }
 
 function StatusBadge({ status }: { readonly status: AgentStatus }) {
   const isLive = status === "submitted" || status === "streaming";
-
   return (
-    <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium uppercase tracking-[0.12em]">
-      <span className="relative flex size-2">
-        {isLive ? (
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent-turquoise opacity-75" />
-        ) : null}
-        <span
-          className={cn(
-            "relative inline-flex size-2 rounded-full transition-colors",
-            status === "error"
-              ? "bg-destructive"
-              : isLive
-                ? "bg-accent-turquoise"
-                : "bg-muted-foreground",
-          )}
-        />
-      </span>
+    <Badge
+      className="uppercase"
+      size="sm"
+      variant={status === "error" ? "destructive-light" : isLive ? "primary-light" : "outline"}
+    >
+      {isLive ? <Spinner className="size-3" /> : null}
       {status}
-    </span>
+    </Badge>
   );
-}
-
-function MetricTile({
-  comparison,
-}: {
-  readonly comparison: (typeof snapshot.comparisons)[number];
-}) {
-  const positive = comparison.absoluteChange >= 0;
-
-  return (
-    <div className="metric-tile">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">
-          {labelForMetric(comparison.metric)}
-        </p>
-        <span
-          className={cn(
-            "rounded-sm px-1.5 py-0.5 font-mono text-[11px]",
-            positive
-              ? "bg-accent-turquoise/10 text-accent-turquoise"
-              : "bg-accent-rose/10 text-accent-rose",
-          )}
-        >
-          {comparison.percentChange === null
-            ? "n/a"
-            : `${positive ? "+" : ""}${comparison.percentChange.toFixed(1)}%`}
-        </span>
-      </div>
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <span className="font-mono text-2xl font-semibold">
-          {formatValue(comparison.metric, comparison.current.value)}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          was {formatValue(comparison.metric, comparison.previous.value)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function StackMoment({
-  icon: Icon,
-  label,
-  value,
-}: {
-  readonly icon: typeof Layers3Icon;
-  readonly label: string;
-  readonly value: string;
-}) {
-  return (
-    <div className="stack-row">
-      <span className="flex size-8 items-center justify-center rounded-md bg-muted text-foreground">
-        <Icon className="size-4" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {value}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function Timeline({
-  events,
-  isEmpty,
-}: {
-  readonly events: readonly StreamEvent[];
-  readonly isEmpty: boolean;
-}) {
-  const visible = events
-    .map((event, index) => toTimelineItem(event, index))
-    .filter((event): event is TimelineItem => event !== null)
-    .slice(-40)
-    .reverse();
-
-  if (isEmpty || visible.length === 0) {
-    return (
-      <div className="flex min-h-48 flex-1 items-center justify-center rounded-md border border-dashed border-border text-center text-sm text-muted-foreground">
-        Session events will appear here while the Loyalty Analyst works.
-      </div>
-    );
-  }
-
-  return (
-    <div className="timeline-scroll">
-      <ol className="space-y-3">
-        {visible.map((event) => (
-          <li className={cn("timeline-item", event.tone)} key={event.key}>
-            <span className={cn("timeline-icon", event.tone)}>
-              <event.icon className="size-3.5" />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="timeline-eyebrow">{event.eyebrow}</p>
-                  <p className="timeline-title">{event.title}</p>
-                </div>
-                {event.meta ? (
-                  <span className="timeline-meta">{event.meta}</span>
-                ) : null}
-              </div>
-              <p className="timeline-detail">{event.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function toTimelineItem(
-  event: StreamEvent,
-  index: number,
-): TimelineItem | null {
-  const key = `${index}-${event.type}`;
-
-  switch (event.type) {
-    case "session.started": {
-      const runtime = asRecord(asRecord(event.data)?.runtime);
-      const modelId = readString(runtime?.modelId);
-      const gitSha = readString(asRecord(runtime?.build)?.gitSha);
-      return {
-        key,
-        eyebrow: "session",
-        title: "Agent runtime online",
-        detail: modelId
-          ? `Loyalty Analyst is running on ${modelId}.`
-          : "Loyalty Analyst opened a durable Eve session.",
-        meta: gitSha ? gitSha.slice(0, 7) : undefined,
-        tone: "teal",
-        icon: ActivityIcon,
-      };
-    }
-    case "turn.started":
-      return {
-        key,
-        eyebrow: "turn",
-        title: "Turn started",
-        detail: `Durable workflow turn ${readString(asRecord(event.data)?.turnId) ?? "started"}.`,
-        meta: readSequenceMeta(asRecord(event.data)?.sequence),
-        tone: "purple",
-        icon: WorkflowIcon,
-      };
-    case "message.received":
-      return {
-        key,
-        eyebrow: "input",
-        title: "User prompt received",
-        detail: truncate(
-          readString(asRecord(event.data)?.message) ??
-            "Eve accepted the user turn.",
-          92,
-        ),
-        tone: "teal",
-        icon: MessageSquareIcon,
-      };
-    case "actions.requested":
-      return {
-        key,
-        eyebrow: "action",
-        title: readActionTitle(event.data),
-        detail: readActionDetail(event.data),
-        meta: readActionCount(event.data),
-        tone: "gold",
-        icon: readActionIcon(event.data),
-      };
-    case "action.result":
-      return {
-        key,
-        eyebrow: "result",
-        title: readToolResultTitle(event.data),
-        detail: readToolResultDetail(event.data),
-        meta: readToolResultMeta(event.data),
-        tone: "cyan",
-        icon: CheckCircle2Icon,
-      };
-    case "subagent.called": {
-      const label = subagentLabel(event.data);
-      return {
-        key,
-        eyebrow: "subagent",
-        title: `${label} delegated`,
-        detail: `Loyalty Analyst handed the analysis to the ${label}.`,
-        meta: readChildSession(event.data),
-        tone: "gold",
-        icon: BotIcon,
-      };
-    }
-    case "subagent.completed": {
-      const label = subagentLabel(event.data);
-      return {
-        key,
-        eyebrow: "subagent",
-        title: `${label} completed`,
-        detail: truncate(
-          readString(asRecord(event.data)?.output) ??
-            "The child agent returned its specialist handoff.",
-          110,
-        ),
-        meta: readString(asRecord(event.data)?.subagentName),
-        tone: "teal",
-        icon: BotIcon,
-      };
-    }
-    case "step.started":
-      return {
-        key,
-        eyebrow: "workflow",
-        title: `Step ${readNumber(asRecord(event.data)?.stepIndex) ?? ""} started`,
-        detail: "Eve checkpointed the run and advanced the durable turn.",
-        tone: "purple",
-        icon: WorkflowIcon,
-      };
-    case "step.completed":
-      return {
-        key,
-        eyebrow: "workflow",
-        title: `Step ${readNumber(asRecord(event.data)?.stepIndex) ?? ""} completed`,
-        detail: readUsageDetail(event.data),
-        meta: readCostMeta(event.data),
-        tone: "purple",
-        icon: WorkflowIcon,
-      };
-    case "message.completed":
-      return {
-        key,
-        eyebrow: "answer",
-        title: "Final response ready",
-        detail: truncate(
-          readString(asRecord(event.data)?.message) ??
-            "Loyalty Analyst finished the answer.",
-          110,
-        ),
-        tone: "teal",
-        icon: SparklesIcon,
-      };
-    case "session.waiting":
-      return {
-        key,
-        eyebrow: "ready",
-        title: "Session parked",
-        detail: "Loyalty Analyst is waiting durably for the next turn.",
-        tone: "purple",
-        icon: WorkflowIcon,
-      };
-    case "turn.completed":
-      return {
-        key,
-        eyebrow: "turn",
-        title: "Turn completed",
-        detail: "The durable Eve turn finished successfully.",
-        tone: "purple",
-        icon: WorkflowIcon,
-      };
-    case "turn.failed":
-    case "session.failed":
-      return {
-        key,
-        eyebrow: "error",
-        title: "Run failed",
-        detail:
-          readString(asRecord(event.data)?.errorText) ??
-          "Inspect the chat error for details.",
-        tone: "red",
-        icon: AlertCircleIcon,
-      };
-    case "reasoning.appended":
-    case "message.appended":
-      return null;
-    default:
-      return {
-        key,
-        eyebrow: "event",
-        title: humanizeEventType(event.type),
-        detail: "Eve emitted a low-level stream event.",
-        tone: "muted",
-        icon: ActivityIcon,
-      };
-  }
-}
-
-const SUBAGENT_LABELS: Record<string, string> = {
-  "crm-analyst": "CRM Analyst",
-  "cdp-analyst": "CDP Analyst",
-  "rewards-analyst": "Rewards Analyst",
-  "revenue-analyst": "Revenue Analyst",
-  "offer-strategist": "Offer Strategist",
-};
-
-const TOOL_META: Record<
-  string,
-  { readonly title: string; readonly icon: typeof ActivityIcon; readonly resultTitle: string }
-> = {
-  query_members: {
-    title: "Query members",
-    icon: UsersIcon,
-    resultTitle: "Members returned",
-  },
-  segment_members: {
-    title: "Segment members (sandbox)",
-    icon: TerminalSquareIcon,
-    resultTitle: "Segmentation completed",
-  },
-  query_crm: {
-    title: "CRM analysis",
-    icon: DatabaseIcon,
-    resultTitle: "CRM data returned",
-  },
-  query_cdp: {
-    title: "CDP engagement",
-    icon: NetworkIcon,
-    resultTitle: "CDP data returned",
-  },
-  query_loyalty: {
-    title: "Rewards & CLV",
-    icon: AwardIcon,
-    resultTitle: "Rewards data returned",
-  },
-  query_network: {
-    title: "Network RASK",
-    icon: PlaneIcon,
-    resultTitle: "Network data returned",
-  },
-  design_offers: {
-    title: "Design offers",
-    icon: TagIcon,
-    resultTitle: "Offers designed",
-  },
-};
-
-function subagentLabel(data: unknown) {
-  const record = asRecord(data);
-  const name =
-    readString(record?.subagentName) ?? readString(record?.name);
-  if (!name) return "Subagent";
-  return SUBAGENT_LABELS[name] ?? name;
-}
-
-function readActionTitle(data: unknown) {
-  const names = readToolNames(data);
-  const subagentName = names.find((name) => name in SUBAGENT_LABELS);
-  if (subagentName) return `${SUBAGENT_LABELS[subagentName]} requested`;
-  const toolName = names.find((name) => name in TOOL_META);
-  if (toolName) return `${TOOL_META[toolName].title} requested`;
-  if (names.includes("load_skill")) return "Skill context requested";
-  if (names.includes("bash")) return "Sandbox command requested";
-  return names.length > 0 ? "Tool call requested" : "Action requested";
-}
-
-function readActionDetail(data: unknown) {
-  const names = readToolNames(data);
-  if (names.length === 0) return "The model selected an Eve action.";
-  return `Calling ${formatList(names)}.`;
-}
-
-function readActionCount(data: unknown) {
-  const count = readActions(data).length;
-  return count > 1 ? `${count} calls` : undefined;
-}
-
-function readActionIcon(data: unknown) {
-  const names = readToolNames(data);
-  const subagentName = names.find((name) => name in SUBAGENT_LABELS);
-  if (subagentName) return BotIcon;
-  const toolName = names.find((name) => name in TOOL_META);
-  if (toolName) return TOOL_META[toolName].icon;
-  if (names.includes("bash")) return TerminalSquareIcon;
-  if (names.includes("load_skill")) return SparklesIcon;
-  return WrenchIcon;
-}
-
-function readToolNames(data: unknown) {
-  return readActions(data)
-    .map(
-      (action) =>
-        readString(asRecord(action)?.name) ??
-        readString(asRecord(action)?.toolName),
-    )
-    .filter((name): name is string => typeof name === "string");
-}
-
-function readActions(data: unknown) {
-  const record = asRecord(data);
-  return Array.isArray(record?.actions) ? record.actions : [];
-}
-
-function readToolResultTitle(data: unknown) {
-  const result = asRecord(asRecord(data)?.result);
-  const name = readString(result?.toolName) ?? readString(result?.subagentName);
-  if (name && name in SUBAGENT_LABELS) return `${SUBAGENT_LABELS[name]} result returned`;
-  if (name && name in TOOL_META) return TOOL_META[name].resultTitle;
-  if (name === "load_skill") return "Definitions loaded";
-  if (name === "bash") return "Sandbox command completed";
-  return name ? `${name} returned` : "Action result returned";
-}
-
-function readToolResultDetail(data: unknown) {
-  const result = asRecord(asRecord(data)?.result);
-  const name = readString(result?.toolName) ?? readString(result?.subagentName);
-  const output = result?.output;
-
-  if (name === "segment_members") {
-    const outputRecord = asRecord(output);
-    const sandbox = asRecord(outputRecord?.sandbox);
-    const filesWritten = Array.isArray(sandbox?.filesWritten)
-      ? sandbox.filesWritten.length
-      : undefined;
-    const artifactNote = filesWritten
-      ? ` Wrote ${filesWritten} sandbox artifacts.`
-      : "";
-    return truncate(
-      `${readString(outputRecord?.takeaway) ?? "Python segmentation ran inside the Eve sandbox."}${artifactNote}`,
-      110,
-    );
-  }
-
-  if (
-    name === "query_members" ||
-    name === "query_crm" ||
-    name === "query_cdp" ||
-    name === "query_loyalty" ||
-    name === "query_network"
-  ) {
-    const outputRecord = asRecord(output);
-    const rows = Array.isArray(outputRecord?.rows)
-      ? outputRecord.rows.length
-      : undefined;
-    return `${TOOL_META[name].title} data returned${rows ? ` across ${rows} rows` : ""}.`;
-  }
-
-  if (name === "design_offers") {
-    const outputRecord = asRecord(output);
-    const offers = Array.isArray(outputRecord?.offers)
-      ? outputRecord.offers.length
-      : undefined;
-    return `Designed${offers ? ` ${offers}` : ""} retention offer${offers === 1 ? "" : "s"}.`;
-  }
-
-  if (name === "load_skill") {
-    return "Loyalty Analyst loaded metric definitions before answering.";
-  }
-
-  if (name === "bash") {
-    const outputRecord = asRecord(output);
-    return truncate(
-      readString(outputRecord?.stdout) ||
-        readString(outputRecord?.stderr) ||
-        "Command completed.",
-      110,
-    );
-  }
-
-  return truncate(
-    typeof output === "string"
-      ? output
-      : "A durable action returned data to the model.",
-    110,
-  );
-}
-
-function readToolResultMeta(data: unknown) {
-  const result = asRecord(asRecord(data)?.result);
-  const status = readString(asRecord(data)?.status);
-  const name = readString(result?.toolName) ?? readString(result?.subagentName);
-  if (name === "segment_members") {
-    const sandbox = asRecord(asRecord(result?.output)?.sandbox);
-    const filesWritten = Array.isArray(sandbox?.filesWritten)
-      ? sandbox.filesWritten.length
-      : undefined;
-    if (sandbox?.used === true && filesWritten) return `${filesWritten} files`;
-    return sandbox?.used === true ? "sandbox" : status;
-  }
-  return status;
-}
-
-function readChildSession(data: unknown) {
-  const record = asRecord(data);
-  const childSessionId =
-    typeof record?.childSessionId === "string" ? record.childSessionId : null;
-  return childSessionId
-    ? childSessionId.replace(/^wrun_/, "child ")
-    : undefined;
-}
-
-function readUsageDetail(data: unknown) {
-  const usage = asRecord(asRecord(data)?.usage);
-  const inputTokens = readNumber(usage?.inputTokens);
-  const outputTokens = readNumber(usage?.outputTokens);
-  if (inputTokens !== undefined || outputTokens !== undefined) {
-    return `${formatInteger(inputTokens ?? 0)} input tokens, ${formatInteger(outputTokens ?? 0)} output tokens.`;
-  }
-  return "The workflow step finished and state was checkpointed.";
-}
-
-function readCostMeta(data: unknown) {
-  const cost = asRecord(asRecord(data)?.usage)?.costUsd;
-  return typeof cost === "number" ? `$${cost.toFixed(4)}` : undefined;
-}
-
-function readString(value: unknown) {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function readNumber(value: unknown) {
-  return typeof value === "number" ? value : undefined;
-}
-
-function readSequenceMeta(value: unknown) {
-  const sequence = readNumber(value);
-  return sequence === undefined ? undefined : `#${sequence}`;
-}
-
-function truncate(value: string, maxLength: number) {
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length > maxLength
-    ? `${compact.slice(0, maxLength - 1)}...`
-    : compact;
-}
-
-function formatList(items: readonly string[]) {
-  if (items.length === 0) return "selected tools";
-  if (items.length === 1) return `\`${items[0]}\``;
-  return items.map((item) => `\`${item}\``).join(", ");
-}
-
-function formatInteger(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function humanizeEventType(type: string) {
-  return type
-    .split(".")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function labelForMetric(metric: string) {
-  const labels: Record<string, string> = {
-    loadFactor: "Load Factor",
-    raskMxn: "RASK",
-    rpkMillions: "RPK filled",
-    valueAtRiskMxn: "Value at risk",
-  };
-  return labels[metric] ?? metric;
-}
-
-function formatValue(metric: string, value: number) {
-  if (metric === "loadFactor") {
-    return new Intl.NumberFormat("en-US", {
-      style: "percent",
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    }).format(value);
-  }
-  if (metric === "raskMxn") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "MXN",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-  if (metric === "rpkMillions") {
-    return `${new Intl.NumberFormat("en-US", {
-      maximumFractionDigits: 0,
-    }).format(value)} M`;
-  }
-  if (metric === "valueAtRiskMxn") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "MXN",
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(value);
-  }
-  return new Intl.NumberFormat("en-US").format(value);
 }

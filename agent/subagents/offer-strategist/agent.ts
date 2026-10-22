@@ -2,7 +2,8 @@ import { defineAgent } from "eve";
 
 export default defineAgent({
   description:
-    "Design ranked Club Premier retention/growth offers that recover the most RASK per peso of incentive cost.",
+    "Design ranked Club Premier retention/growth offers that recover the most RASK per peso of incentive cost, and " +
+      "personalize the channel and weekday per member with consent and holdout guardrails.",
   model: "anthropic/claude-sonnet-5",
   reasoning: "medium",
   limits: {

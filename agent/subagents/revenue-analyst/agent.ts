@@ -2,7 +2,8 @@ import { defineAgent } from "eve";
 
 export default defineAgent({
   description:
-    "Analyze RPK, RASK, load factor, and yield by route and tier against fixed ASK network capacity; keeper of the fixed-ASK doctrine.",
+    "Analyze RPK, RASK, load factor, and yield by route and tier against fixed ASK network capacity; attribute RASK to " +
+      "channels and campaigns; keeper of the fixed-ASK doctrine.",
   model: "anthropic/claude-sonnet-5",
   reasoning: "medium",
   limits: {

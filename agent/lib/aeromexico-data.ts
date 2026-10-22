@@ -136,15 +136,15 @@ export type NetworkSnapshot = {
   readonly byTier: readonly TierSnapshot[];
 };
 
-const TODAY = "2026-07-18";
+export const TODAY = "2026-07-18";
 
-function addDays(date: string, days: number): string {
+export function addDays(date: string, days: number): string {
   const parsed = new Date(`${date}T00:00:00Z`);
   parsed.setUTCDate(parsed.getUTCDate() + days);
   return parsed.toISOString().slice(0, 10);
 }
 
-function daysBetween(from: string, to: string): number {
+export function daysBetween(from: string, to: string): number {
   const ms = new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime();
   return Math.round(ms / 86_400_000);
 }
@@ -438,7 +438,7 @@ export const networkCapacity: readonly RouteCapacity[] = [
 
 // --- Bookings: deterministic mulberry32 PRNG, never Math.random ---------
 
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
   return function rng() {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -449,7 +449,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function weightedPick<T>(rng: () => number, items: readonly T[], weights: readonly number[]): T {
+export function weightedPick<T>(rng: () => number, items: readonly T[], weights: readonly number[]): T {
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   let roll = rng() * total;
   for (let index = 0; index < items.length; index += 1) {

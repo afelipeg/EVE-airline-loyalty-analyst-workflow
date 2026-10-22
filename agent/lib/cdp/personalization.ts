@@ -1,6 +1,6 @@
-import { TODAY, cdpProfiles, daysBetween, getUnifiedMembers } from "../aeromexico-data.js";
-import { getIdentityGraph } from "./identity.js";
-import { getCdpSources, isHoldout, type DigitalChannel } from "./sources.js";
+import { TODAY, cdpProfiles, daysBetween, getUnifiedMembers } from "../aeromexico-data";
+import { getIdentityGraph } from "./identity";
+import { getCdpSources, isHoldout, type DigitalChannel } from "./sources";
 
 // Channel and timing decisioning per member, from identity-resolved activity.
 // Deterministic: same data, same plan. It never sends anything; it decides

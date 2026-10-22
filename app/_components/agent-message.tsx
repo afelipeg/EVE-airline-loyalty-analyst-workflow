@@ -37,6 +37,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 import { cn } from "@/lib/utils";
+import { ActivationConsole } from "./activation-console";
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
@@ -152,9 +153,19 @@ function AgentMessagePart({
     case "authorization":
       return <AuthorizationPrompt part={part} />;
     case "dynamic-tool":
+      if (part.toolName === "record_activation_spec") {
+        return <ActivationConsole canRespond={canRespond} onInputResponses={onInputResponses} part={part} />;
+      }
       return (
         <div className="space-y-3">
           <SandboxChart output={part.output} toolName={part.toolName} />
+          {/* Outside the collapsible: an approval must stay visible even if
+              the row mounted before the request arrived. */}
+          <InputRequestActions
+            canRespond={canRespond}
+            part={part}
+            onInputResponses={onInputResponses}
+          />
           <Trace>
             <TraceCollapsible
               defaultOpen={
@@ -173,11 +184,6 @@ function AgentMessagePart({
               </TraceCollapsibleTrigger>
               <TraceCollapsibleContent className="space-y-3">
                 <ToolJson label="Input" value={part.input} />
-                <InputRequestActions
-                  canRespond={canRespond}
-                  part={part}
-                  onInputResponses={onInputResponses}
-                />
                 <SandboxArtifactSummary
                   output={part.output}
                   toolName={part.toolName}

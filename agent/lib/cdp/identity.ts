@@ -1,4 +1,4 @@
-import { daysBetween } from "../aeromexico-data.js";
+import { daysBetween } from "../aeromexico-data";
 import {
   getCdpSources,
   hashEmail,
@@ -7,7 +7,7 @@ import {
   type AncillaryOrder,
   type CampaignSend,
   type DigitalEvent,
-} from "./sources.js";
+} from "./sources";
 
 // Deterministic identity resolution. Rules fire in precision order and a lower
 // tier never overrides a higher one:

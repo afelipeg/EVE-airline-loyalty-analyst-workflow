@@ -12,7 +12,7 @@ import {
   weightedPick,
   type Booking,
   type CdpProfile,
-} from "../aeromexico-data.js";
+} from "../aeromexico-data";
 
 // Synthetic input systems for the CDP. Each one only carries the identifiers
 // that system would really have, so identity.ts has to stitch them:

@@ -8,13 +8,18 @@ import {
   ArrowUpIcon,
   BotIcon,
   CalendarClockIcon,
+  FingerprintIcon,
   Layers3Icon,
   LogOutIcon,
   MessageSquareIcon,
   PanelRightIcon,
   PlaneIcon,
   PlayIcon,
+  NetworkIcon,
+  RouteIcon,
   SparklesIcon,
+  TargetIcon,
+  UsersRoundIcon,
   TerminalSquareIcon,
   WorkflowIcon,
 } from "lucide-react";
@@ -54,8 +59,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AgentMessage } from "./agent-message";
+import type { AttributionModel } from "@/agent/lib/cdp/attribution";
+import { AttributionView, type AttributionData } from "./attribution-view";
+import { IdentityView, type IdentitySummary } from "./identity-view";
 import { JevPanel, useJevReports } from "./jev-panel";
 import { MetricsPanel, snapshot } from "./metrics-panel";
+import { PersonalizationView, type PersonalizationData } from "./personalization-view";
+import { RaskDriversView, type RaskDrivers } from "./rask-drivers-view";
+import { TeamRunView } from "./team-run-view";
 import { RunTimeline, type StreamEvent } from "./run-timeline";
 
 const AGENT_NAME = "Loyalty Analyst";
@@ -78,8 +89,30 @@ const stackMoments = [
 
 type AgentStatus = ReturnType<typeof useEveAgent>["status"];
 type InspectorTab = "jev" | "run" | "metrics";
+type View = "chat" | "identity" | "attribution" | "personalization" | "team" | "drivers";
 
-export function AgentChat({ userEmail }: { readonly userEmail: string }) {
+const views = [
+  { id: "chat", label: "Chat", icon: MessageSquareIcon },
+  { id: "identity", label: "Identity", icon: FingerprintIcon },
+  { id: "attribution", label: "Attribution", icon: RouteIcon },
+  { id: "personalization", label: "Personalization", icon: TargetIcon },
+  { id: "team", label: "Team run", icon: UsersRoundIcon },
+  { id: "drivers", label: "RASK drivers", icon: NetworkIcon },
+] as const;
+
+export function AgentChat({
+  attribution,
+  drivers,
+  identity,
+  personalization,
+  userEmail,
+}: {
+  readonly attribution: AttributionData;
+  readonly drivers: Readonly<Record<AttributionModel, RaskDrivers>>;
+  readonly identity: IdentitySummary;
+  readonly personalization: PersonalizationData;
+  readonly userEmail: string;
+}) {
   const agent = useEveAgent();
   const isMobile = useIsMobile();
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
@@ -93,6 +126,8 @@ export function AgentChat({ userEmail }: { readonly userEmail: string }) {
   const showInspector = isMobile ? inspectorSheetOpen : inspectorOpen;
   const toggleInspector = () => (isMobile ? setInspectorSheetOpen : setInspectorOpen)((open) => !open);
   const [tab, setTab] = useState<InspectorTab>("jev");
+  // Only the left panel swaps; the chat session lives in this component.
+  const [view, setView] = useState<View>("chat");
 
   const send = async (text: string) => {
     const message = text.trim();
@@ -101,6 +136,7 @@ export function AgentChat({ userEmail }: { readonly userEmail: string }) {
   };
 
   const sendSuggestion = async (text: string) => {
+    setView("chat");
     if (isBusy) return;
     await agent.send({
       message: text,
@@ -110,6 +146,10 @@ export function AgentChat({ userEmail }: { readonly userEmail: string }) {
         previousWeek: snapshot.previousWeek,
       },
     });
+  };
+
+  const planSegment = (segment: string) => {
+    void sendSuggestion(`Personalize a retention activation for ${segment} members: offer, channel and day, ready for my approval.`);
   };
 
   const inspector = (
@@ -127,8 +167,10 @@ export function AgentChat({ userEmail }: { readonly userEmail: string }) {
       <AppSidebar
         isBusy={isBusy}
         onSuggestion={sendSuggestion}
+        onViewChange={setView}
         status={agent.status}
         userEmail={userEmail}
+        view={view}
       />
       <SidebarInset className="min-h-0 overflow-hidden">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
@@ -154,7 +196,14 @@ export function AgentChat({ userEmail }: { readonly userEmail: string }) {
 
         <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
           <ResizablePanel minSize="40">
-            <div className="flex h-full min-h-0 flex-col">
+            {view === "identity" ? <IdentityView summary={identity} /> : null}
+            {view === "attribution" ? <AttributionView data={attribution} /> : null}
+            {view === "personalization" ? (
+              <PersonalizationView data={personalization} isBusy={isBusy} onPlanSegment={planSegment} />
+            ) : null}
+            {view === "team" ? <TeamRunView events={events} status={agent.status} /> : null}
+            {view === "drivers" ? <RaskDriversView drivers={drivers} /> : null}
+            <div className={view === "chat" ? "flex h-full min-h-0 flex-col" : "hidden"}>
               {agent.error ? (
                 <Alert variant="destructive" className="mx-auto mt-4 w-[calc(100%-2rem)] max-w-3xl">
                   <AlertCircleIcon />
@@ -240,13 +289,17 @@ export function AgentChat({ userEmail }: { readonly userEmail: string }) {
 function AppSidebar({
   isBusy,
   onSuggestion,
+  onViewChange,
   status,
   userEmail,
+  view,
 }: {
   readonly isBusy: boolean;
   readonly onSuggestion: (text: string) => void;
+  readonly onViewChange: (view: View) => void;
   readonly status: AgentStatus;
   readonly userEmail: string;
+  readonly view: View;
 }) {
   const router = useRouter();
 
@@ -275,6 +328,22 @@ function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Views</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {views.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton isActive={view === item.id} onClick={() => onViewChange(item.id)} tooltip={item.label}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>Ask</SidebarGroupLabel>
           <SidebarGroupContent>

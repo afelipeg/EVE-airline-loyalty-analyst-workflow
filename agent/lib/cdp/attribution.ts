@@ -1,6 +1,6 @@
-import { TODAY, bookings, daysBetween, getNetworkSnapshot, type Booking } from "../aeromexico-data.js";
-import { getIdentityGraph } from "./identity.js";
-import { CAMPAIGNS, WINDOW_START, getCdpSources, isHoldout, type DigitalChannel } from "./sources.js";
+import { TODAY, addDays, bookings, daysBetween, getNetworkSnapshot, type Booking } from "../aeromexico-data";
+import { getIdentityGraph } from "./identity";
+import { CAMPAIGNS, WINDOW_START, getCdpSources, isHoldout, type DigitalChannel } from "./sources";
 
 // Multi-touch attribution of revenue to channels, then to RASK. ASK is fixed:
 // a channel's RASK contribution is the revenue it is credited with divided by
@@ -234,5 +234,97 @@ export function getHoldoutLift() {
     revenuePerMemberLiftPct:
       holdout.revenuePerMemberMxn === 0 ? null : share(treated.revenuePerMemberMxn - holdout.revenuePerMemberMxn, holdout.revenuePerMemberMxn),
     caveat: `Directional only: ${holdout.members} holdout members vs ${treated.members} treated, no significance test at this size.`,
+  };
+}
+
+// Weekly engagement per channel across the window, for the trend chart:
+// campaign sends/opens/clicks by send channel, organic sessions by source.
+export function getEngagementByWeek() {
+  const sources = getCdpSources();
+  const graph = getIdentityGraph();
+  const weekOf = (date: string) => Math.min(12, Math.floor(daysBetween(WINDOW_START, date) / 7));
+  const weeks = Array.from({ length: 13 }, (_, index) => ({
+    week: index + 1,
+    weekStart: addDays(WINDOW_START, index * 7),
+    email: { sends: 0, opens: 0, clicks: 0 },
+    push: { sends: 0, opens: 0, clicks: 0 },
+    in_app: { sends: 0, opens: 0, clicks: 0 },
+    webSessions: 0,
+    appSessions: 0,
+  }));
+  for (const send of sources.sends) {
+    const bucket = weeks[weekOf(send.sentDate)][send.channel];
+    bucket.sends += 1;
+    if (send.opened) bucket.opens += 1;
+    if (send.clicked) bucket.clicks += 1;
+  }
+  const seen = new Set<string>();
+  for (const event of sources.events) {
+    if (seen.has(event.sessionId) || event.date < WINDOW_START || !graph.resolutions.get(event.eventId)?.memberId) continue;
+    seen.add(event.sessionId);
+    const week = weeks[weekOf(event.date)];
+    if (event.source === "web") week.webSessions += 1;
+    else week.appSessions += 1;
+  }
+  return weeks;
+}
+
+// "High engagement is not high RASK": each touch channel ranked by
+// engagement volume (campaign opens + clicks, or resolved organic sessions)
+// and by attributed RASK under the chosen model.
+export function getEngagementVsRask(model: AttributionModel = "position_based") {
+  const attribution = getAttribution(model).byChannel;
+  const touchCounts = new Map<AttributionChannel, number>();
+  for (const touches of touchesByMember().values()) {
+    for (const touch of touches) touchCounts.set(touch.channel, (touchCounts.get(touch.channel) ?? 0) + 1);
+  }
+  const channels: readonly AttributionChannel[] = ["email", "push", "in_app", "web_organic", "app_organic"];
+  const rows = channels.map((channel) => ({
+    channel,
+    engagements: touchCounts.get(channel) ?? 0,
+    raskMxn: attribution.find((a) => a.channel === channel)?.raskMxn ?? 0,
+  }));
+  const rank = (key: "engagements" | "raskMxn") => {
+    const ordered = [...rows].sort((a, b) => b[key] - a[key]).map((r) => r.channel);
+    return (channel: AttributionChannel) => ordered.indexOf(channel) + 1;
+  };
+  const byEngagement = rank("engagements");
+  const byRask = rank("raskMxn");
+  return rows.map((r) => ({
+    ...r,
+    raskPerEngagementMxn: r.engagements === 0 ? 0 : round(r.raskMxn / r.engagements, 6),
+    engagementRank: byEngagement(r.channel),
+    raskRank: byRask(r.channel),
+  }));
+}
+
+// The RASK driver tree for the impact map: RASK is the north star, load
+// factor, yield and ancillary share are the levers (ASK is fixed, so they are
+// the only ones), and campaigns hang off RASK by their attributed slice.
+// Edge weights are attributed shares, not correlations.
+export function getRaskDrivers(model: AttributionModel = "position_based") {
+  const network = getNetworkSnapshot();
+  const attribution = getAttribution(model);
+  return {
+    northStar: { raskMxn: round(network.raskMxn, 4), windowRaskMxn: attribution.totals.windowRaskMxn },
+    levers: [
+      { id: "load_factor", label: "Load factor", value: round(network.loadFactor * 100, 1), unit: "%" },
+      { id: "yield", label: "Yield", value: round(network.yieldMxnPerKm, 3), unit: "MXN/km" },
+      { id: "ancillary_share", label: "Ancillary share", value: round(network.ancillaryShare * 100, 1), unit: "%" },
+    ],
+    fixedAsk: { askMillions: round(network.askMillions, 3) },
+    campaigns: attribution.byCampaign.map((campaign) => ({
+      id: campaign.campaignId,
+      name: campaign.name,
+      channel: campaign.channel,
+      raskMxn: campaign.raskMxn,
+      shareOfWindowRaskPct: share(campaign.raskMxn, attribution.totals.windowRaskMxn),
+      revenuePerPesoCost: campaign.revenuePerPesoCost,
+    })),
+    channels: attribution.byChannel.map((channel) => ({
+      channel: channel.channel,
+      raskMxn: channel.raskMxn,
+      revenueSharePct: channel.revenueSharePct,
+    })),
   };
 }

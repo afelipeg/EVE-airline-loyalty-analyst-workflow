@@ -47,13 +47,13 @@ export function LoginForm({
           <form className="flex flex-col gap-5" onSubmit={onSubmit}>
             <FieldGroup className="gap-4">
               <Field className="gap-2" data-invalid={error ? true : undefined}>
-                <FieldLabel htmlFor="auth-20-identifier">Email</FieldLabel>
+                <FieldLabel htmlFor="auth-20-identifier">Email or username</FieldLabel>
                 <Input
                   id="auth-20-identifier"
                   name="email"
-                  type="email"
+                  type="text"
                   autoComplete="username"
-                  placeholder="you@company.com"
+                  placeholder="you@company.com or username"
                   required
                   aria-invalid={error ? true : undefined}
                 />
